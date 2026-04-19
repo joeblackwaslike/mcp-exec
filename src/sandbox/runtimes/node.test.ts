@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import vm from 'vm';
 import { runInNode } from './node.js';
 import { SessionManager } from '../session.js';
 
