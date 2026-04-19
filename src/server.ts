@@ -39,7 +39,8 @@ async function main() {
     }
 
     try {
-      await SandboxManager.initialize(sandboxConfig);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await SandboxManager.initialize(sandboxConfig as any);
     } catch (err) {
       console.warn(
         '[mcp-exec] SandboxManager.initialize() failed (running outside srt sandbox process — non-fatal):',
