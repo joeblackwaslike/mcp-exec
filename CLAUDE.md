@@ -11,15 +11,7 @@ When working on or developing this plugin (modifying hooks, commands, skills, or
 
 Also consult `docs/architecture/` for design context:
 
-[write docs and update here after prd finalized]
-
-## Superpowers Skills
-
-Use the superpowers skills during development. When in doubt, invoke the skill — it's better to check and not need it than to skip it.
-
-## Beads for task management
-
-This repo uses beads for task management. Use the beads skill provided by the beads plugin.
+TODO: [write docs/architecture/{files}.md and list each here with description after prd finalized]
 
 ## Project overview
 
@@ -70,10 +62,10 @@ docs/
 ## Key design decisions
 
 - **Sandbox config**: read `sandbox` block from `~/.claude/settings.json` + `.claude/settings.json`, merge arrays, map to `SandboxRuntimeConfig`. ~30 lines. Do not replicate CC's full config parser.
-- **MCP server hosts**: auto-extracted from `mcp-exec.config.json` server URLs at startup, merged into `allowedDomains`.
-- **Sessions**: implicit by default (shared within a conversation); explicit `session_id` only for parallel isolation.
-- **Thenable chaining**: `exec({...}).then({...})` pipes stdout between sandbox calls. Must be a real Promise so `await` resolves to final output.
-- **Runtime param**: string shorthand (`"node"`, `"bash"`, `"python"`) or configured instance (`new Node({ sandbox: { ... } })`).
+- **MCP server hosts**: read from `.claude/mcp.json` at startup; server hostnames merged into `allowedDomains`.
+- **Sessions**: implicit by default (shared within a conversation); explicit `session_id` only for parallel isolation. `globalThis.*` persistence is Node-only — Bash/Python are stateless.
+- **Thenable chaining**: `exec()` returns a real `Promise<ExecResult>` — standard `.then()`, no auto-piping. Agent uses `execResult.stdout` to thread raw output between runtimes explicitly.
+- **Runtime param**: string shorthand (`"node"`, `"bash"`, `"python"`) or config object (`{ type: "node", timeout?: number, env?: Record<string,string> }`). Sandbox policy is global (settings.json only) — not per-call configurable.
 
 ## Development milestones
 
@@ -87,4 +79,4 @@ docs/
 - Zero changes to Claude Code itself — pure MCP config
 - No hosted/cloud product — local-first only
 - No vendor lock-in or credential system assumptions
-- Auth via env vars declared per-server in `mcp-exec.config.json`
+- Auth via env vars present in the shell environment (`.env`, direnv, secrets manager)
