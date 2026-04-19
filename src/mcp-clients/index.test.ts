@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readMcpConfig, type McpServerConfig } from './index.js';
+import { readMcpConfig } from './index.js';
 import { mkdtempSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
