@@ -1,4 +1,4 @@
-import vm from 'vm';
+import vm from 'node:vm';
 
 const IMPLICIT_SESSION_ID = '__implicit__';
 

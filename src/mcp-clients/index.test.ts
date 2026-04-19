@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { readMcpConfig } from './index.js';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
 
 describe('readMcpConfig', () => {
   it('returns empty object when mcp.json does not exist', () => {
@@ -23,7 +23,7 @@ describe('readMcpConfig', () => {
       }),
     );
     const config = readMcpConfig(tmpDir);
-    expect(config['gmail']).toMatchObject({ command: 'npx' });
+    expect(config.gmail).toMatchObject({ command: 'npx' });
   });
 
   it('handles malformed mcp.json without throwing', () => {

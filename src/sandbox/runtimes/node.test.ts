@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { runInNode } from './node.js';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { SessionManager } from '../session.js';
+import { runInNode } from './node.js';
 
 describe('runInNode', () => {
   let sessions: SessionManager;

@@ -1,7 +1,7 @@
 import type { ExecResult, RuntimeParam } from '../types.js';
-import type { SessionManager } from './session.js';
-import { runInNode } from './runtimes/node.js';
 import { runInBash } from './runtimes/bash.js';
+import { runInNode } from './runtimes/node.js';
+import type { SessionManager } from './session.js';
 
 interface ExecOptions {
   code: string;
@@ -9,7 +9,10 @@ interface ExecOptions {
   session_id?: string;
 }
 
-type McpClientMap = Record<string, { callTool: (name: string, params?: unknown) => Promise<unknown> }>;
+type McpClientMap = Record<
+  string,
+  { callTool: (name: string, params?: unknown) => Promise<unknown> }
+>;
 
 export function createExecDispatcher(sessions: SessionManager, mcpClients: McpClientMap) {
   return async function exec(opts: ExecOptions): Promise<ExecResult> {

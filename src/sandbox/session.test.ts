@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionManager } from './session.js';
 
 describe('SessionManager', () => {
@@ -27,7 +27,9 @@ describe('SessionManager', () => {
 
   it('injects mcpClients into session context', () => {
     const mockClients = { gmail: { callTool: vi.fn() } };
+    // biome-ignore lint/suspicious/noExplicitAny: test mock bypasses McpClientMap type
     const ctx = manager.getOrCreate(undefined, mockClients as any);
+    // biome-ignore lint/suspicious/noExplicitAny: accessing vm.Context sandbox property
     expect((ctx as any).__mcpClients).toBe(mockClients);
   });
 

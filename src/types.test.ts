@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import type { ToolSummary, ToolCallRecord, ExecResult, RuntimeParam } from './types.js';
+import { describe, expect, it } from 'vitest';
+import type { ExecResult, RuntimeParam, ToolCallRecord, ToolSummary } from './types.js';
 
 describe('types', () => {
   it('ToolSummary has required shape', () => {

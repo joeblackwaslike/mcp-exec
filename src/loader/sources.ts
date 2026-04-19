@@ -2,14 +2,26 @@
 const GMAIL_TOOLS = [
   { name: 'searchEmails', description: 'Search emails by query', params: 'query: string' },
   { name: 'getEmail', description: 'Get a single email by ID', params: 'id: string' },
-  { name: 'sendEmail', description: 'Send an email', params: 'to: string, subject: string, body: string' },
+  {
+    name: 'sendEmail',
+    description: 'Send an email',
+    params: 'to: string, subject: string, body: string',
+  },
   { name: 'listLabels', description: 'List all Gmail labels', params: '' },
 ];
 
 const GDRIVE_TOOLS = [
-  { name: 'searchFiles', description: 'Search Drive files by name or content', params: 'query: string' },
+  {
+    name: 'searchFiles',
+    description: 'Search Drive files by name or content',
+    params: 'query: string',
+  },
   { name: 'getFile', description: 'Get file metadata by ID', params: 'id: string' },
-  { name: 'createDocument', description: 'Create a new Google Doc', params: 'title: string, content?: string' },
+  {
+    name: 'createDocument',
+    description: 'Create a new Google Doc',
+    params: 'title: string, content?: string',
+  },
   { name: 'listFiles', description: 'List files in a folder', params: 'folderId?: string' },
 ];
 

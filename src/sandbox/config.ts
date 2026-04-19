@@ -1,6 +1,6 @@
-import { readFileSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
+import { readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 interface SandboxRuntimeConfig {
   network?: { allowedDomains?: string[] };
@@ -53,11 +53,9 @@ export function resolveSandboxConfig(cwd = process.cwd()): SandboxRuntimeConfig 
       allowedDomains: mergeArrays(user.network?.allowedDomains, project.network?.allowedDomains),
     },
     filesystem: {
-      allowWrite: mergeArrays(
-        user.filesystem?.allowWrite,
-        project.filesystem?.allowWrite,
-        ['~/.mcp-exec/sessions'],
-      ),
+      allowWrite: mergeArrays(user.filesystem?.allowWrite, project.filesystem?.allowWrite, [
+        '~/.mcp-exec/sessions',
+      ]),
       denyRead: mergeArrays(user.filesystem?.denyRead, project.filesystem?.denyRead),
       denyWrite: mergeArrays(user.filesystem?.denyWrite, project.filesystem?.denyWrite),
       allowRead: mergeArrays(user.filesystem?.allowRead, project.filesystem?.allowRead),

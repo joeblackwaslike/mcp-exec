@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 import type { ExecResult } from '../../types.js';
 
 /** Runs Bash code in a stateless subprocess. No session state persists between calls. */

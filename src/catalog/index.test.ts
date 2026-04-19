@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { searchTools, getAllTools } from './index.js';
+import { describe, expect, it } from 'vitest';
+import { getAllTools, searchTools } from './index.js';
 
 describe('getAllTools', () => {
   it('returns tools for gmail and gdrive', () => {
@@ -19,7 +19,12 @@ describe('searchTools', () => {
 
   it('filters by single token matching tool name', () => {
     const results = searchTools('search');
-    expect(results.every((t) => t.name.toLowerCase().includes('search') || t.description.toLowerCase().includes('search'))).toBe(true);
+    expect(
+      results.every(
+        (t) =>
+          t.name.toLowerCase().includes('search') || t.description.toLowerCase().includes('search'),
+      ),
+    ).toBe(true);
     expect(results.length).toBeGreaterThan(0);
   });
 
@@ -31,10 +36,13 @@ describe('searchTools', () => {
 
   it('requires all tokens to match (AND logic)', () => {
     const results = searchTools('search emails');
-    expect(results.every((t) =>
-      (t.name + ' ' + t.description).toLowerCase().includes('search') ||
-      (t.name + ' ' + t.description).toLowerCase().includes('email'),
-    )).toBe(true);
+    expect(
+      results.every(
+        (t) =>
+          `${t.name} ${t.description}`.toLowerCase().includes('search') ||
+          `${t.name} ${t.description}`.toLowerCase().includes('email'),
+      ),
+    ).toBe(true);
   });
 
   it('strips stop words from query', () => {

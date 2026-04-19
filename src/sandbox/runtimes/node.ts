@@ -1,4 +1,4 @@
-import vm from 'vm';
+import vm from 'node:vm';
 import type { ExecResult } from '../../types.js';
 
 const PREAMBLE_LINES = 1;
@@ -40,10 +40,12 @@ export async function runInNode(
   }
 
   // Hook process.stdout.write and process.stderr.write in the context
-  if (context.process && context.process.stdout) {
+  if (context.process?.stdout) {
+    // biome-ignore lint/suspicious/noExplicitAny: vm.Context is untyped; write overload is complex
     context.process.stdout.write = captureStdout as any;
   }
-  if (context.process && context.process.stderr) {
+  if (context.process?.stderr) {
+    // biome-ignore lint/suspicious/noExplicitAny: vm.Context is untyped; write overload is complex
     context.process.stderr.write = captureStderr as any;
   }
 

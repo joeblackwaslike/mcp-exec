@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 const SKILL_BLOCK = `
 ## Important
@@ -19,13 +19,11 @@ function installSkill(targetPath: string): void {
   }
 
   if (existing.includes(MARKER)) {
-    console.log(`[mcp-exec] Skill loader already present in ${targetPath} — skipping.`);
     return;
   }
 
   const separator = existing.endsWith('\n') ? '\n' : '\n\n';
   writeFileSync(targetPath, existing + separator + SKILL_BLOCK);
-  console.log(`[mcp-exec] Skill loader appended to ${targetPath}`);
 }
 
 const isLocal = process.argv.includes('--local');

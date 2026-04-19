@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Must mock before importing the module under test
 vi.mock('os', async (importOriginal) => {
@@ -12,8 +12,8 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+import * as os from 'node:os';
 import { resolveSandboxConfig } from './config.js';
-import * as os from 'os';
 
 describe('resolveSandboxConfig', () => {
   let tmpDir: string;

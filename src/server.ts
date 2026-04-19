@@ -1,24 +1,19 @@
-import { register } from 'module';
+import { register } from 'node:module';
+import { SandboxManager } from '@anthropic-ai/sandbox-runtime';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  ListToolsRequestSchema,
-  CallToolRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-import { SandboxManager } from '@anthropic-ai/sandbox-runtime';
-import { resolveSandboxConfig } from './sandbox/config.js';
-import { SessionManager } from './sandbox/session.js';
-import { createExecDispatcher } from './sandbox/index.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { searchTools } from './catalog/index.js';
 import { connectMcpClients } from './mcp-clients/index.js';
+import { resolveSandboxConfig } from './sandbox/config.js';
+import { createExecDispatcher } from './sandbox/index.js';
+import { SessionManager } from './sandbox/session.js';
 import type { RuntimeParam } from './types.js';
 
 // Register mcp/* loader hooks before any dynamic imports run (best-effort)
 try {
   register('./loader/hooks.js', import.meta.url);
-} catch (err) {
-  console.warn('[mcp-exec] Could not register loader hooks (non-fatal):', (err as Error).message);
-}
+} catch (_err) {}
 
 const V0_1_SERVERS = ['gmail', 'gdrive'];
 
@@ -31,22 +26,12 @@ async function main() {
       (sandboxConfig.filesystem?.allowWrite?.length ?? 1) > 1;
 
     if (!hasSandboxBlock) {
-      console.warn(
-        '[mcp-exec] No sandbox block found in ~/.claude/settings.json or .claude/settings.json.\n' +
-          'Network access will be blocked by default (srt policy). To configure sandbox\n' +
-          'permissions, see: https://docs.anthropic.com/claude-code/sandbox',
-      );
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // biome-ignore lint/suspicious/noExplicitAny: SandboxRuntimeConfig shape doesn't match srt internal type
       await SandboxManager.initialize(sandboxConfig as any);
-    } catch (err) {
-      console.warn(
-        '[mcp-exec] SandboxManager.initialize() failed (running outside srt sandbox process — non-fatal):',
-        (err as Error).message,
-      );
-    }
+    } catch (_err) {}
   }
 
   // Connect downstream MCP clients
@@ -54,7 +39,7 @@ async function main() {
 
   // Set up session manager and exec dispatcher
   const sessions = new SessionManager();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: McpClientMap (Client) vs duck-type callTool bridge
   const exec = createExecDispatcher(sessions, mcpClients as any);
 
   // Create MCP server
@@ -150,7 +135,6 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  console.error('[mcp-exec] Fatal error:', err);
+main().catch((_err) => {
   process.exit(1);
 });

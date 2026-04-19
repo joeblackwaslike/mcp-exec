@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createExecDispatcher } from './index.js';
 import { SessionManager } from './session.js';
 
@@ -38,8 +38,9 @@ describe('createExecDispatcher', () => {
   it('throws on unsupported runtime type', async () => {
     const sessions = new SessionManager();
     const exec = createExecDispatcher(sessions, {});
-    await expect(
-      exec({ code: 'print("hi")', runtime: 'python' as any }),
-    ).rejects.toThrow('Unsupported runtime: python');
+    // biome-ignore lint/suspicious/noExplicitAny: testing unsupported runtime rejection
+    await expect(exec({ code: 'print("hi")', runtime: 'python' as any })).rejects.toThrow(
+      'Unsupported runtime: python',
+    );
   });
 });

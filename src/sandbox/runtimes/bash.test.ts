@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { runInBash } from './bash.js';
 
 describe('runInBash', () => {
@@ -26,12 +26,12 @@ describe('runInBash', () => {
 
   it('supports pipes and shell features', async () => {
     const result = await runInBash('echo \'{"a":1}\' | jq .a');
-    expect(result.result.trim()).toBe('1');
+    expect(String(result.result).trim()).toBe('1');
   });
 
   it('is stateless — variables do not persist between calls', async () => {
     await runInBash('X=hello');
     const result = await runInBash('echo $X');
-    expect(result.result.trim()).toBe('');
+    expect(String(result.result).trim()).toBe('');
   });
 });

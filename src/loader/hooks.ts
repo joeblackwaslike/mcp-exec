@@ -26,7 +26,10 @@ export async function resolve(
 export async function load(
   url: string,
   context: object,
-  nextLoad: (u: string, c: object) => Promise<{ source: string; format: string; shortCircuit?: boolean }>,
+  nextLoad: (
+    u: string,
+    c: object,
+  ) => Promise<{ source: string; format: string; shortCircuit?: boolean }>,
 ): Promise<{ source: string; format: string; shortCircuit?: boolean }> {
   if (url.startsWith('virtual:mcp/')) {
     const serverName = url.replace('virtual:mcp/', '');

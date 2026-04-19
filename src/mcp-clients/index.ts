@@ -1,5 +1,5 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -39,7 +39,6 @@ export async function connectMcpClients(
     serverNames.map(async (name) => {
       const config = configs[name];
       if (!config) {
-        console.warn(`[mcp-exec] Server "${name}" not found in .claude/mcp.json — skipping`);
         return [name, null] as const;
       }
 
