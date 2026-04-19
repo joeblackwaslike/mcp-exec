@@ -1,7 +1,7 @@
 # PRD: `mcp-exec` — Code Execution MCP Plugin for Claude Code
 
-**Status:** Draft v5
-**Last updated:** 2026-04
+**Status:** Draft v7
+**Last updated:** 2026-04-19
 
 ---
 
@@ -24,11 +24,12 @@ the context window.
 
 ## Goals
 
-- Reduce per-workflow token consumption by 80–95% on multi-tool tasks
+- Reduce per-workflow token consumption by ~99%+ when used with CC Tool Search
+  (mcp-exec alone: ~23–77% depending on intermediate result sizes)
 - Allow Claude Code to access arbitrarily many downstream tools without context bloat
 - Zero changes to Claude Code itself — pure MCP configuration
-- OS-level sandbox reusing the user's existing CC sandbox settings — zero extra config
-  for users who already have CC sandboxing set up
+- Zero extra config for individual developer setups — reads the same user and project
+  `settings.json` files Claude Code uses
 - Shareable, general-purpose: no vendor lock-in, no credential system assumptions
 
 ## Non-goals
@@ -41,17 +42,31 @@ the context window.
 
 ## Architecture
 
+> **MCP tool interface** (JSON-RPC primitives only):
+>
+> - `tools({ query: string }) → ToolSummary[]`
+> - `exec({ code: string, runtime: "node" | "bash" | "python", session_id?: string }) → { result: string, tool_calls: ToolCallRecord[] }`
+>
+> `ToolCallRecord`: `{ server: string, tool: string, duration_ms: number, error?: string }`
+>
+> The `runtime` parameter is a string shorthand only at the MCP layer. `new Node({...})`
+> is a sandbox-injected global available inside code strings, not an MCP parameter.
+
 ### Components
 
 **1. `mcp-exec` server** — the MCP server registered with Claude Code. Exposes two tools:
 
-- `list_tools(query?: string)` — returns matching tools from connected MCP servers.
-  Returns trimmed summaries: `name`, `description`, one-line signature.
-- `run_code(code: string, language: "typescript" | "python", session_id?: string)` —
-  executes submitted code in the sandbox and returns the final result.
+- `tools(query: string)` — searches connected MCP servers and returns matching tools.
+  Pass `"*"` to return all tools. Otherwise the query is split on whitespace and each
+  token is matched case-insensitively against `name` and `description` (AND logic —
+  all tokens must appear). Returns trimmed summaries: `name`, `description`, one-line
+  signature.
+- `exec(code: string, runtime: "node" | "bash" | "python", session_id?: string)` —
+  executes submitted code in the sandbox and returns `{ result, tool_calls }`. The
+  `runtime` parameter accepts string shorthands only at the MCP layer.
 
 **2. Tool catalog** — in-process index of downstream MCP server schemas, loaded lazily
-per server on first `list_tools` call. Full schemas are never bulk-sent to the model;
+per server on first `tools` call. Full schemas are never bulk-sent to the model;
 only trimmed summaries are returned.
 
 **3. Execution sandbox** — powered by `@anthropic-ai/sandbox-runtime` (`srt`), the same
@@ -59,20 +74,73 @@ sandbox Anthropic uses internally for Claude Code's bash tool. Uses OS-level pri
 `sandbox-exec` (macOS Seatbelt) on macOS, `bubblewrap` on Linux/WSL2. All restrictions
 apply to every child process spawned by agent code — not just the top-level process.
 
-**4. Runtime abstraction layer** — thin interface over subprocess spawning, structured
-to accommodate Node.js now and Python in v0.3:
+**4. Runtime abstraction layer** — each runtime is a configured object that knows how
+to spawn its subprocess. Runtimes accept a string shorthand (`"node"`, `"bash"`,
+`"python"`) for default config, or an instantiated object for custom settings inside
+code strings:
+
+```typescript
+// string shorthand at the MCP layer — default sandbox config
+exec({ runtime: "node", code: `...` })
+
+// configured instance — used inside code strings as a sandbox-injected global
+const node = new Node({ sandbox: { network: ['api.github.com'] } });
+exec({ runtime: node, code: `...` })
+```
 
 ```
 sandbox/
-  index.ts              ← interface: execute(code, language, session) → result
+  index.ts              ← interface: exec({ runtime, code }) → ExecResult
   runtimes/
     node.ts             ← Node.js subprocess runner (v0.1+)
+    bash.ts             ← Bash subprocess runner (v0.1+)
     python.ts           ← Python subprocess runner (v0.3+)
-  runner-template.ts    ← shim harness, shared across runtimes
 ```
 
-The sandbox layer (srt) wraps whichever subprocess is spawned. Adding Python is a new
-`python.ts` spawn wrapper — no changes to the sandbox or catalog layers.
+The sandbox layer (srt) wraps whichever subprocess is spawned. Adding a runtime is a
+new spawn wrapper — no changes to the sandbox or catalog layers.
+
+### Import resolution
+
+mcp-exec uses Node.js module loader hooks via `module.register()` to intercept
+`import { github } from 'mcp/github'` inside sandbox code strings. The `resolve` hook
+matches `mcp/*` specifiers; the `load` hook returns dynamically generated source that
+wraps the MCP client connection mcp-exec maintains for that server. No files on disk.
+Stable API since Node 18.6, refined in 20.6+.
+
+mcp-exec spawns subprocesses with `--import` pointing to a loader registration file.
+Each exported name corresponds to a tool on that server; calling it invokes the tool
+via the MCP client.
+
+- v0.1: loader returns static generated source for hardcoded servers
+- v0.2+: loader dynamically generates source from the lazily-loaded tool catalog
+
+### Thenable chaining
+
+mcp-exec injects an `exec` global into every sandbox environment. Code that Claude
+writes can use `exec({...}).then({...})` to chain cross-runtime steps; `await` resolves
+to the final output, which is returned as the MCP tool result.
+
+`exec()` returns a thenable `ExecResult`. Chained `.then()` calls pipe the previous
+result's stdout into the next call's stdin. The chain is a real Promise — `await`
+resolves to the final output.
+
+```typescript
+// fetch PRs with node, trim output with bash
+await exec({ runtime: "node", code: `
+  import { github } from 'mcp/github';
+  return await github.listPRs({ state: 'open' });
+`}).then({ runtime: "bash", code: "jq '[.[] | {title, url}]' | head -5" });
+```
+
+This enables the agent to compose MCP orchestration (node/python) with unix-style
+post-processing (bash) in a single logical chain. Each step runs in the sandbox.
+
+### Implicit sessions
+
+Calls within a conversation share an implicit session by default — no `session_id`
+required. The agent only needs explicit session IDs when it wants isolated parallel
+sessions. Sessions are cleaned up after a configurable idle timeout (default: 10 min).
 
 ---
 
@@ -122,6 +190,11 @@ About 30 lines of code. The CC config complexity that's being deliberately avoid
 individual developers. The two files `mcp-exec` reads are the only ones that matter
 for that audience.
 
+Enterprise or managed scopes (MDM, registry, plist delivery) are not read. If your
+team enforces sandbox policy through those channels, add a local `sandbox` block to
+`.claude/settings.json` or `~/.claude/settings.json` to replicate the relevant
+settings for `mcp-exec`.
+
 ```typescript
 // sandbox/config.ts — the entire config resolution logic
 
@@ -153,24 +226,15 @@ function mergeArrays(...arrays: (string[] | undefined)[]): string[] {
   return [...new Set(arrays.flat().filter((x): x is string => x != null))]
 }
 
-export function resolveSandboxConfig(
-  mcpServerUrls: string[],
-): SandboxRuntimeConfig {
+export function resolveSandboxConfig(): SandboxRuntimeConfig {
   const user = readSandboxBlock(join(homedir(), '.claude', 'settings.json'))
   const project = readSandboxBlock(join(process.cwd(), '.claude', 'settings.json'))
-
-  // extract hostnames from declared MCP server URLs
-  const mcpHosts = mcpServerUrls.flatMap(url => {
-    try { return [new URL(url).host] } catch { return [] }
-  })
 
   return {
     network: {
       allowedDomains: mergeArrays(
         user.network?.allowedDomains,
         project.network?.allowedDomains,
-        mcpHosts,
-        ['localhost', '127.0.0.1'],
       ),
     },
     filesystem: {
@@ -196,6 +260,20 @@ export function resolveSandboxConfig(
 }
 ```
 
+### No sandbox config found
+
+If neither settings file exists or neither contains a `sandbox` block, `mcp-exec` emits
+a startup warning:
+
+```
+[mcp-exec] No sandbox block found in ~/.claude/settings.json or .claude/settings.json.
+Network access will be blocked by default (srt's own policy). To configure sandbox
+permissions, see: https://docs.anthropic.com/claude-code/sandbox
+```
+
+SRT's own default (block all outbound network) applies. mcp-exec does not add fallback
+defaults — the user must opt in to network access explicitly.
+
 ### Schema drift risk
 
 The only fragility is if Anthropic renames fields inside the `sandbox` block of
@@ -204,17 +282,6 @@ and semver-significant if it happened. The mapping function is the only code tha
 need updating, and it's isolated in one file. This is an acceptable tradeoff given that
 the alternative (duplicating CC's full multi-scope config parser) would be far more
 brittle and require tracking every internal parsing edge case CC handles.
-
-### Fallback for users without CC sandbox config
-
-If neither settings file exists or neither contains a `sandbox` block, `mcp-exec` uses
-safe defaults:
-
-- Write access: `~/.mcp-exec/sessions` only
-- Read access: current working directory
-- Network: `localhost` + auto-extracted MCP server hosts only
-
-No sandbox config is required — the tool is secure out of the box.
 
 ### Security model
 
@@ -239,15 +306,19 @@ Known limitations inherited from srt (same as CC's sandbox):
 // .claude/mcp.json — before mcp-exec
 { "servers": ["gmail", "gdrive", "github", "salesforce", "jira", "slack"] }
 
-// .claude/mcp.json — after mcp-exec
-{ "servers": ["mcp-exec"] }
-// downstream servers declared in mcp-exec.config.json
+// .claude/mcp.json — after adding mcp-exec (additive — existing servers stay)
+{ "servers": ["gmail", "gdrive", "github", "salesforce", "jira", "slack", "mcp-exec"] }
 ```
 
-Token comparison for a representative multi-tool workflow:
+mcp-exec is additive. Downstream servers remain registered with CC and are still
+callable directly. mcp-exec adds two tools (`tools`, `exec`) for multi-step workflows.
+
+### Token comparison
+
+Representative multi-tool workflow (gmail search → gdrive create → slack post):
 
 ```
-Before mcp-exec:
+Baseline (no mcp-exec, CC Tool Search off):
   schemas loaded at startup           →  40,000 tokens
   gmail.search result in context      →   8,000 tokens
   gdrive.create result in context     →   3,000 tokens
@@ -255,14 +326,37 @@ Before mcp-exec:
   ─────────────────────────────────────────────────────
   Total                               →  52,000 tokens
 
-After mcp-exec:
-  list_tools("email search")          →     200 tokens
-  run_code(full workflow)             →      50 tokens
+CC Tool Search only (no mcp-exec):
+  schemas loaded on-demand (3 tools)  →       0 tokens
+  gmail.search result in context      →   8,000 tokens
+  gdrive.create result in context     →   3,000 tokens
+  slack.post result in context        →   1,000 tokens
   ─────────────────────────────────────────────────────
-  Total                               →     250 tokens
+  Total                               →  12,000 tokens   (~77% reduction)
 
-Reduction: ~99.5%
+mcp-exec + CC Tool Search (recommended):
+  schemas loaded on-demand            →       0 tokens
+  exec(full workflow)                 →      50 tokens
+  ─────────────────────────────────────────────────────
+  Total                               →      50 tokens   (~99.9% reduction)
 ```
+
+**Companion feature:** CC's built-in MCP Tool Search (v2.1.7+, Sonnet 4+ / Opus 4+)
+eliminates schema loading tokens automatically by loading only the 3–5 tools Claude
+actually needs on demand, rather than all schemas upfront. mcp-exec eliminates
+intermediate result tokens. Used together they reduce per-workflow token cost by ~99%+.
+Tool Search is on by default; disable with `{ "enable_tool_search": false }` in CC
+settings if needed.
+
+### Prefix caching benefit
+
+mcp-exec dramatically improves CC's prefix cache hit rate. With servers registered
+directly, the system prompt includes 40k+ tokens of MCP schemas — any schema change
+invalidates the cache. With mcp-exec + Tool Search, the system prompt contains only
+mcp-exec's 2-tool schema (~100 tokens), which almost never changes. Cache prefixes
+are smaller, more stable, and cheaper per hit. Intermediate results also stay out of
+conversation history, keeping per-turn context lean and extending how long a
+conversation can run before hitting limits.
 
 ---
 
@@ -299,6 +393,12 @@ skills/
     stateful-checkpoint.ts
 ```
 
+`SKILL.md` required sections: how to use `tools(query)` to discover available tools,
+import syntax (`import { toolName } from 'mcp/server-name'`), thenable chaining
+patterns with examples, session usage (implicit vs explicit `session_id`), error
+handling (`{ error, line, column }` and retry patterns), when NOT to use mcp-exec
+(simple single-tool calls).
+
 SDK reference files are pre-processed: changelogs, deprecated APIs, and verbose prose
 stripped. What remains: types, method signatures, concise usage examples.
 
@@ -306,40 +406,107 @@ stripped. What remains: types, method signatures, concise usage examples.
 
 ## Auth
 
-Tokens are passed to shims via environment variables inherited from the host process.
-The sandbox receives a filtered env — only keys matching each server's declared prefix:
+The sandbox inherits the full process environment. Any credentials already present in
+the shell that starts Claude Code (via `.env` files, direnv, a secrets manager, or
+direct `export`) are available to code running inside the sandbox. No configuration
+required.
 
-```jsonc
-{
-  "servers": [
-    { "name": "github", "url": "...", "env": ["GITHUB_TOKEN"] }
-  ]
-}
-```
-
-Credential-system-agnostic: `.env` files, direnv, any secrets manager.
+**Note:** All env vars present at process start are in scope for the session lifetime —
+not just those belonging to a specific server. Per-invocation scoping (forwarding only
+the env vars relevant to a specific import) would require static analysis of import
+statements and is deferred to a future hardening pass. This is a known limitation.
 
 ---
 
 ## Session persistence
 
-`run_code` calls sharing a `session_id` share a Node.js worker context. Variables,
-imports, and in-memory state persist across calls within a session. Sessions are cleaned
-up after a configurable idle timeout (default: 10 minutes).
+Calls within a conversation share an implicit session by default. Variables, imports,
+and in-memory state persist across calls. Explicit `session_id` is only needed for
+isolated parallel sessions. Sessions are cleaned up after a configurable idle timeout
+(default: 10 minutes).
+
+### Implicit session identity
+
+- **stdio transport (common case):** CC spawns one mcp-exec process per conversation.
+  One process = one implicit session. Natural per-conversation isolation, nothing to
+  configure.
+- **HTTP/SSE transport (future):** one implicit session per persistent client connection;
+  connection lifetime ≈ conversation lifetime.
+
+With stdio, each new CC conversation gets a fresh implicit session automatically. With
+HTTP transports, use explicit `session_id` for strict isolation between branches or
+parallel workflows.
+
+### Explicit session_id
+
+The full explicit session surface:
+
+- **Named sessions** — `session_id: "research-phase"` creates or resumes a named session
+  across calls
+- **Parallel sessions** — multiple active session_ids simultaneously; independent state,
+  no bleed between them
+- **Forking pattern** — start a new session_id to branch from a clean slate without
+  affecting the current session
+- **Checkpointing** — session state persists to disk; survives sandbox restarts (v1.0)
+- **Expiry** — configurable idle timeout; expired session returns
+  `{ error: "session_expired", session_id }` so Claude can restart or re-hydrate
+
+### Session internals
+
+Each session is a persistent Node.js `vm.Context` kept alive between `exec` calls for
+the session's lifetime. `globalThis` in that context survives across calls — this is how
+`globalThis.prs` set in call 1 is available in call 2. The sandbox subprocess for each
+call runs inside this persistent context.
 
 ```typescript
 // call 1 — fetch and store
-await run_code(`
+await exec({ runtime: "node", code: `
   import { github } from 'mcp/github';
   globalThis.prs = await github.listPRs({ state: 'open' });
-`, { session_id: "review-session" });
+  return globalThis.prs.length + ' PRs fetched';
+`});
 
-// call 2 — state is still there
-await run_code(`
+// call 2 — use stored state
+await exec({ runtime: "node", code: `
   const flagged = globalThis.prs.filter(pr => pr.labels.includes('needs-review'));
   return flagged.map(pr => pr.url);
-`, { session_id: "review-session" });
+`});
+
+// chained — single expression, fetch + trim
+await exec({ runtime: "node", code: `
+  import { github } from 'mcp/github';
+  return await github.listPRs({ state: 'open' });
+`}).then({ runtime: "bash", code: "jq '[.[] | select(.labels[] == \"needs-review\") | .url]'" });
 ```
+
+---
+
+## Plugin and hook compatibility
+
+CC hooks fire on tool-use events visible to the host CC process. When downstream tools
+are called inside `exec`, those calls happen within the sandbox subprocess and do not
+generate CC tool-use events. Specifically:
+
+- **Lifecycle hooks** (`SessionStart`, `pre-compact`, `PostToolUse` on `exec` itself):
+  fire normally — they are tied to conversation/session events or to the `exec` tool
+  call, not to downstream tool names.
+- **`PreToolUse`/`PostToolUse` hooks watching downstream tool names** (e.g.
+  `github.listPRs`): do NOT fire when those tools are called inside an `exec` sandbox.
+  The sandbox is opaque to the host CC event system.
+
+mcp-exec surfaces a `tool_calls` array in every exec result to restore per-tool
+observability for plugins:
+
+```typescript
+// exec result shape
+{ result: string, tool_calls: ToolCallRecord[] }
+
+// ToolCallRecord
+{ server: string, tool: string, duration_ms: number, error?: string }
+```
+
+Plugin authors: see [`docs/DEVELOPER.md`](../DEVELOPER.md) for compatibility guidance,
+the `tool_calls` schema, and the planned plugin compatibility checker (`v0.2`).
 
 ---
 
@@ -349,21 +516,23 @@ await run_code(`
 
 - `mcp-exec` MCP server in TypeScript (Node.js)
 - Hardcoded support for 2–3 MCP servers (Gmail, GDrive)
-- `srt` sandbox integration via `resolveSandboxConfig()` reading CC settings files
-- Auto-merge of MCP server hostnames into `allowedDomains`
-- Safe fallback defaults when no CC sandbox config is present
-- Runtime abstraction in place; Node.js runner only
-- `list_tools` + `run_code` tools; session persistence via `session_id`
+- `srt` sandbox integration via `resolveSandboxConfig()` — pure pass-through of CC
+  sandbox settings; startup warning emitted if no sandbox block found
+- Runtime abstraction: `Node` and `Bash` runtimes; string shorthand (`"node"`, `"bash"`)
+  and configured instance (`new Node({ ... })`) both supported
+- `tools` + `exec` tools; implicit sessions (no `session_id` required by default)
+- Thenable chaining: `exec({...}).then({...})` pipes stdout between calls
 - SKILL.md + `install-skill` CLI command
 - Manual token count comparison vs baseline
 
 ### v0.2 — dynamic catalog + TS SDK reference
 
 - Generic MCP client shim generator (any MCP-compliant server)
-- `mcp-exec.config.json` schema with env key forwarding
-- `list_tools(query)` with fuzzy search over lazily-loaded catalog
+- `tools(query)` with whitespace-split AND substring matching over lazily-loaded catalog
 - `ts-sdk-reference.md` in skills — pre-processed TypeScript MCP SDK docs
 - Structured error surfacing: exceptions → `{ error, line, column }` to Claude
+- `npx mcp-exec check-plugins` — scans `~/.claude/settings.json` hooks, identifies
+  ones watching downstream MCP tool names, prints compatibility report
 
 ### v0.3 — Python support + SDK reference
 
@@ -374,8 +543,14 @@ await run_code(`
 
 ### v1.0 — token benchmarks + production hardening
 
-Token savings test suite run in CI. Each test asserts `tokens_after / tokens_before
-< 0.10` (≥90% reduction). CI reports per-test token delta; regressions fail the build.
+Token savings test suite run in CI. Two test modes:
+
+- **mcp-exec only:** assert intermediate results (bytes returned to context) are < 5%
+  of the pre-mcp-exec baseline. Achievable without Tool Search.
+- **Full stack (mcp-exec + Tool Search enabled):** assert total per-workflow tokens
+  are < 10% of the pre-mcp-exec baseline.
+
+CI reports per-test token delta; regressions fail the build.
 
 | Test case | Source |
 |---|---|
@@ -400,10 +575,15 @@ Additional:
 |---|---|
 | Import CC config parser? | Not possible — it's in the closed-source CC binary. Not needed either: two JSON reads + array merge + schema mapping is ~30 lines and covers the relevant scope for this audience. |
 | Sandbox implementation? | `@anthropic-ai/sandbox-runtime` (srt) |
-| Sandbox config source? | Reads `sandbox` block from `~/.claude/settings.json` and `.claude/settings.json`; maps to `SandboxRuntimeConfig`; MCP server hosts auto-merged |
-| Network allowlist maintenance? | None — auto-derived from `mcp-exec.config.json` server URLs at startup |
-| Hide downstream servers? | No — schema overhead negligible vs workflow savings |
-| Runtime abstraction? | Yes — Node.js in v0.1, Python added in v0.3 as second runner |
-| Persistent sessions? | Yes — opt-in via `session_id`, 10-min idle cleanup |
-| Auth flow? | Env vars forwarded per declared key list; credential-system-agnostic |
+| Sandbox config source? | Reads `sandbox` block from `~/.claude/settings.json` and `.claude/settings.json`; maps to `SandboxRuntimeConfig`. Pure pass-through — no additions. |
+| Network allowlist maintenance? | None — network policy inherited verbatim from CC sandbox settings. Users who have configured CC's sandbox already have what they need. |
+| Downstream servers stay registered with CC? | Yes — mcp-exec is additive. Downstream servers remain in CC's MCP config and are callable directly. |
+| Schema visibility to Claude? | On-demand via `tools(query)` — full schemas are never bulk-sent; only trimmed summaries are returned. |
+| Runtime abstraction? | Yes — Node.js + Bash in v0.1, Python added in v0.3. String shorthand or configured instance. |
+| Persistent sessions? | Yes — implicit by default (stdio = one process = one session), explicit `session_id` for named/parallel/forked sessions. |
+| `runtime` vs `language`? | `runtime` — selecting an execution environment, not a programming language. `"node"` not `"typescript"`. |
+| Thenable chaining? | Yes — `exec({...}).then({...})` pipes stdout; genuinely thenable so `await` resolves to final output |
+| Auth flow? | Full process env inherited by sandbox — no config required. All env vars are in scope for the session lifetime (per-invocation scoping deferred). |
 | Code bugs in sandbox? | Caught, returned as `{ error, line, column }`; Claude retries inline |
+| Per-invocation credential scoping? | Deferred. Full process env inherited by sandbox. All declared server env vars are in scope for the session. Documented as known limitation. |
+| Import resolution mechanism? | Node.js `module.register()` loader hooks (`resolve` + `load`). Intercepts `mcp/*` specifiers, returns dynamically generated source. No files on disk. |
