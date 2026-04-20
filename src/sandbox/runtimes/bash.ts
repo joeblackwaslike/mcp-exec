@@ -10,7 +10,7 @@ export function runInBash(
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
 
-    const child = spawn('/bin/bash', ['-c', code], {
+    const child = spawn('bash', ['-c', code], {
       env: { ...process.env, ...opts.env },
       stdio: ['ignore', 'pipe', 'pipe'],
     });

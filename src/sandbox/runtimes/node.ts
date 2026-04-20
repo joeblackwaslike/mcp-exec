@@ -11,6 +11,22 @@ function adjustLineNumber(line: number): number {
   return Math.max(1, line - PREAMBLE_LINES);
 }
 
+/** Builds a console object that captures output into the provided arrays. */
+function makeCapturedConsole(
+  stdoutChunks: string[],
+  stderrChunks: string[],
+): Record<string, (...args: unknown[]) => void> {
+  const toLine = (...args: unknown[]) => `${args.map(String).join(' ')}\n`;
+  return {
+    log: (...args) => stdoutChunks.push(toLine(...args)),
+    info: (...args) => stdoutChunks.push(toLine(...args)),
+    dir: (...args) => stdoutChunks.push(toLine(...args)),
+    warn: (...args) => stderrChunks.push(toLine(...args)),
+    error: (...args) => stderrChunks.push(toLine(...args)),
+    debug: (...args) => stderrChunks.push(toLine(...args)),
+  };
+}
+
 /** Runs code in a persistent vm.Context. Does not apply srt wrapping (done at server level). */
 export async function runInNode(
   code: string,
@@ -21,33 +37,9 @@ export async function runInNode(
   const stdoutChunks: string[] = [];
   const stderrChunks: string[] = [];
 
-  const origStdoutWrite = process.stdout.write.bind(process.stdout);
-  const origStderrWrite = process.stderr.write.bind(process.stderr);
-
-  const captureStdout = (chunk: string | Buffer): boolean => {
-    stdoutChunks.push(chunk.toString());
-    return origStdoutWrite(chunk as string);
-  };
-
-  const captureStderr = (chunk: string | Buffer): boolean => {
-    stderrChunks.push(chunk.toString());
-    return origStderrWrite(chunk as string);
-  };
-
-  // Ensure process is available in the context
-  if (!context.process) {
-    context.process = process;
-  }
-
-  // Hook process.stdout.write and process.stderr.write in the context
-  if (context.process?.stdout) {
-    // biome-ignore lint/suspicious/noExplicitAny: vm.Context is untyped; write overload is complex
-    context.process.stdout.write = captureStdout as any;
-  }
-  if (context.process?.stderr) {
-    // biome-ignore lint/suspicious/noExplicitAny: vm.Context is untyped; write overload is complex
-    context.process.stderr.write = captureStderr as any;
-  }
+  // Inject an execution-scoped console — avoids any global process.stdout override
+  // and correctly isolates output across concurrent exec() calls.
+  context.console = makeCapturedConsole(stdoutChunks, stderrChunks);
 
   try {
     const wrapped = wrapCode(code);
@@ -56,24 +48,22 @@ export async function runInNode(
       importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER,
     });
 
-    const stdout = stdoutChunks.join('');
     return {
       result: returnValue as unknown,
-      stdout,
+      stdout: stdoutChunks.join(''),
       stderr: stderrChunks.join(''),
       exitCode: 0,
       tool_calls,
     };
   } catch (err) {
-    const error = err as Error & { lineNumber?: number; columnNumber?: number };
-    const line = adjustLineNumber(error.lineNumber ?? 1);
-    const errorResult = JSON.stringify({
-      error: error.message,
-      line,
-      column: error.columnNumber ?? 1,
-    });
+    const isError = err instanceof Error;
+    const message = isError ? err.message : String(err);
+    const line = isError
+      ? adjustLineNumber((err as Error & { lineNumber?: number }).lineNumber ?? 1)
+      : 1;
+    const column = isError ? ((err as Error & { columnNumber?: number }).columnNumber ?? 1) : 1;
     return {
-      result: errorResult,
+      result: JSON.stringify({ error: message, line, column }),
       stdout: stdoutChunks.join(''),
       stderr: stderrChunks.join(''),
       exitCode: 1,

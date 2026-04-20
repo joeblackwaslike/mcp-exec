@@ -25,7 +25,7 @@
     {
       "name": "install-skill",
       "description": "Append mcp-exec skill loader to CLAUDE.md",
-      "run": "npx mcp-exec install-skill"
+      "run": "npx mcp-exec-install-skill"
     }
   ]
 }

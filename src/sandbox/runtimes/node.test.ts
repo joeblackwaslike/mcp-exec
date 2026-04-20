@@ -16,10 +16,7 @@ describe('runInNode', () => {
   });
 
   it('captures stdout in the stdout field', async () => {
-    const result = await runInNode(
-      'process.stdout.write("hi\\n"); return "done";',
-      sessions.getOrCreate(),
-    );
+    const result = await runInNode('console.log("hi"); return "done";', sessions.getOrCreate());
     expect(result.stdout).toContain('hi');
     expect(result.result).toBe('done');
   });

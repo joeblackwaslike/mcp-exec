@@ -10,10 +10,13 @@ import { createExecDispatcher } from './sandbox/index.js';
 import { SessionManager } from './sandbox/session.js';
 import type { RuntimeParam } from './types.js';
 
-// Register mcp/* loader hooks before any dynamic imports run (best-effort)
+// Register mcp/* loader hooks before any dynamic imports run
 try {
   register('./loader/hooks.js', import.meta.url);
-} catch (_err) {}
+} catch (err) {
+  process.stderr.write(`[mcp-exec] Fatal: failed to register loader hooks: ${err}\n`);
+  process.exit(1);
+}
 
 const V0_1_SERVERS = ['gmail', 'gdrive'];
 
@@ -26,12 +29,18 @@ async function main() {
       (sandboxConfig.filesystem?.allowWrite?.length ?? 1) > 1;
 
     if (!hasSandboxBlock) {
+      process.stderr.write(
+        '[mcp-exec] Warning: no sandbox configuration found in settings.json — running with default permissions\n',
+      );
     }
 
     try {
       // biome-ignore lint/suspicious/noExplicitAny: SandboxRuntimeConfig shape doesn't match srt internal type
       await SandboxManager.initialize(sandboxConfig as any);
-    } catch (_err) {}
+    } catch (err) {
+      process.stderr.write(`[mcp-exec] Fatal: sandbox initialization failed: ${err}\n`);
+      process.exit(1);
+    }
   }
 
   // Connect downstream MCP clients
@@ -135,6 +144,7 @@ async function main() {
   });
 }
 
-main().catch((_err) => {
+main().catch((err) => {
+  process.stderr.write(`[mcp-exec] Fatal: ${err}\n`);
   process.exit(1);
 });

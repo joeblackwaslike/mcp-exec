@@ -4,7 +4,8 @@
   "type": "module",
   "description": "MCP server for sandboxed code execution with context window reduction",
   "bin": {
-    "mcp-exec": "./dist/server.js"
+    "mcp-exec": "./dist/src/server.js",
+    "mcp-exec-install-skill": "./dist/bin/install-skill.js"
   },
   "scripts": {
     "dev": "tsx src/server.ts",

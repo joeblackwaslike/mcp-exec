@@ -1,6 +1,29 @@
 import vm from 'node:vm';
 
 const IMPLICIT_SESSION_ID = '__implicit__';
+const MAX_SESSIONS = 100;
+
+// Allowlist of Node.js globals that user code may legitimately use.
+// Deliberately excludes process, require, and internal module machinery.
+const SAFE_NODE_GLOBALS: Record<string, unknown> = {
+  Buffer,
+  URL,
+  URLSearchParams,
+  TextEncoder,
+  TextDecoder,
+  structuredClone,
+  queueMicrotask,
+  atob,
+  btoa,
+  AbortController,
+  AbortSignal,
+  setTimeout,
+  clearTimeout,
+  setInterval,
+  clearInterval,
+  setImmediate,
+  clearImmediate,
+};
 
 interface SessionEntry {
   context: vm.Context;
@@ -31,8 +54,12 @@ export class SessionManager {
       return existing.context;
     }
 
+    if (this.sessions.size >= MAX_SESSIONS) {
+      throw new Error(`Session limit reached (${MAX_SESSIONS} concurrent sessions)`);
+    }
+
     const context = vm.createContext({
-      ...globalThis,
+      ...SAFE_NODE_GLOBALS,
       __mcpClients: mcpClients ?? {},
       __session_id: id,
     });
