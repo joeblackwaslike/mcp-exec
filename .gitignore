@@ -1,3 +1,8 @@
+node_modules/
+dist/
+coverage/
+*.js.map
+.env
 
 # Beads / Dolt files (added by bd init)
 .dolt/

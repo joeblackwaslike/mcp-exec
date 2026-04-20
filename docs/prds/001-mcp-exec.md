@@ -1,6 +1,6 @@
 # PRD: `mcp-exec` — Code Execution MCP Plugin for Claude Code
 
-**Status:** Draft v7
+**Status:** Draft v11
 **Last updated:** 2026-04-19
 
 ---
@@ -38,6 +38,12 @@ the context window.
 - A hosted/cloud product (local-first, runs on the dev machine)
 - Support for non-MCP tool protocols in v1
 
+## Requirements
+
+- Node.js 20.12+ (required for `vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER`)
+- macOS or Linux (srt uses `sandbox-exec` / `bubblewrap`; Windows not supported)
+- Claude Code 2.1.7+ for full token savings via Tool Search (mcp-exec works without it)
+
 ---
 
 ## Architecture
@@ -49,18 +55,45 @@ the context window.
 >
 > `ToolCallRecord`: `{ server: string, tool: string, duration_ms: number, error?: string }`
 >
-> The `runtime` parameter is a string shorthand only at the MCP layer. `new Node({...})`
-> is a sandbox-injected global available inside code strings, not an MCP parameter.
+> **Internal `ExecResult` type** (TypeScript, not exposed to MCP):
+>
+> ```typescript
+> type ExecResult = {
+>   result: string          // primary output sent to Claude: IIFE return value (Node) or stdout (Bash/Python)
+>   stdout: string          // raw stdout — used internally for cross-runtime data threading
+>   stderr: string
+>   exitCode: number
+>   tool_calls: ToolCallRecord[]
+> }
+> ```
+>
+> The MCP response shape (`{ result, tool_calls }`) is a subset of `ExecResult`.
+>
+> **Code wrapping (Node runtime):** User code strings are wrapped in an async IIFE before
+> execution via `vm.runInContext`. Top-level `return` is valid; the return value becomes
+> `result`. The IIFE wrapper is 1 line, so error `line` numbers subtract 1 for the offset.
+>
+> ```typescript
+> // user writes:          return JSON.stringify(await listPullRequests());
+> // mcp-exec executes:    const __r = await (async () => { ${code} })();
+> ```
+>
+> The `runtime` parameter accepts a string shorthand (`"node"`, `"bash"`, `"python"`) or
+> a structured config object (`{ type: "node", timeout?: number, env?: Record<string,string> }`).
+> `new Node({...})` in examples is conceptual shorthand for constructing that config object —
+> it is NOT a sandbox-injected global and NOT valid inside user code strings.
 
 ### Components
 
 **1. `mcp-exec` server** — the MCP server registered with Claude Code. Exposes two tools:
 
 - `tools(query: string)` — searches connected MCP servers and returns matching tools.
-  Pass `"*"` to return all tools. Otherwise the query is split on whitespace and each
-  token is matched case-insensitively against `name` and `description` (AND logic —
-  all tokens must appear). Returns trimmed summaries: `name`, `description`, one-line
-  signature.
+  Pass `"*"` to return all tools. Otherwise the query is tokenized and matched:
+  - Tokens split on whitespace; stop words (`and`, `or`, `the`, `a`, `is`, etc.) stripped
+  - Tool names are camelCase-split before matching (`listPullRequests` → `list`, `pull`, `requests`)
+  - AND logic: all remaining tokens must appear somewhere in `name` or `description`
+  - Quoted strings (`"pull request"`) match the exact phrase rather than individual tokens
+  - Returns all matching tools (no max count); trimmed summaries: `name`, `description`, one-line signature
 - `exec(code: string, runtime: "node" | "bash" | "python", session_id?: string)` —
   executes submitted code in the sandbox and returns `{ result, tool_calls }`. The
   `runtime` parameter accepts string shorthands only at the MCP layer.
@@ -76,15 +109,16 @@ apply to every child process spawned by agent code — not just the top-level pr
 
 **4. Runtime abstraction layer** — each runtime is a configured object that knows how
 to spawn its subprocess. Runtimes accept a string shorthand (`"node"`, `"bash"`,
-`"python"`) for default config, or an instantiated object for custom settings inside
-code strings:
+`"python"`) for default config, or a structured object for per-call overrides.
+Sandbox policy is global (from settings.json) and cannot be overridden per call or
+per runtime — only `timeout` and `env` are per-call configurable:
 
 ```typescript
 // string shorthand at the MCP layer — default sandbox config
 exec({ runtime: "node", code: `...` })
 
-// configured instance — used inside code strings as a sandbox-injected global
-const node = new Node({ sandbox: { network: ['api.github.com'] } });
+// configured instance — per-call timeout and env overrides
+const node = new Node({ timeout: 30_000, env: { GITHUB_TOKEN: process.env.GITHUB_TOKEN } });
 exec({ runtime: node, code: `...` })
 ```
 
@@ -104,33 +138,43 @@ new spawn wrapper — no changes to the sandbox or catalog layers.
 
 mcp-exec uses Node.js module loader hooks via `module.register()` to intercept
 `import { github } from 'mcp/github'` inside sandbox code strings. The `resolve` hook
-matches `mcp/*` specifiers; the `load` hook returns dynamically generated source that
-wraps the MCP client connection mcp-exec maintains for that server. No files on disk.
-Stable API since Node 18.6, refined in 20.6+.
+maps `mcp/*` specifiers to a `virtual:` URL; the `load` hook returns dynamically
+generated source with one named export per tool — no files on disk.
 
-mcp-exec spawns subprocesses with `--import` pointing to a loader registration file.
-Each exported name corresponds to a tool on that server; calling it invokes the tool
-via the MCP client.
+Generated module shape (e.g. `@mcp/github`):
+```typescript
+export async function listPullRequests(params?: Record<string, unknown>) {
+  return globalThis.__mcpClients.github.callTool('listPullRequests', params);
+}
+// ... one export per tool in the server's tool list
+```
+
+User code runs in a `vm.Context` via `vm.runInContext(code, ctx, {
+  importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER
+})`, which delegates dynamic `import()` to the loader hook chain. Requires Node 20.12+.
+`globalThis.__mcpClients` is injected into each session context at creation time.
+
+Generated source is cached per server at startup; regenerated if the tool list changes.
 
 - v0.1: loader returns static generated source for hardcoded servers
 - v0.2+: loader dynamically generates source from the lazily-loaded tool catalog
 
 ### Thenable chaining
 
-mcp-exec injects an `exec` global into every sandbox environment. Code that Claude
-writes can use `exec({...}).then({...})` to chain cross-runtime steps; `await` resolves
-to the final output, which is returned as the MCP tool result.
-
-`exec()` returns a thenable `ExecResult`. Chained `.then()` calls pipe the previous
-result's stdout into the next call's stdin. The chain is a real Promise — `await`
-resolves to the final output.
+`exec()` returns a real `Promise<ExecResult>` — standard `.then()` chaining, no magic.
+The agent threads data between steps explicitly in the callback.
 
 ```typescript
-// fetch PRs with node, trim output with bash
-await exec({ runtime: "node", code: `
-  import { github } from 'mcp/github';
-  return await github.listPRs({ state: 'open' });
-`}).then({ runtime: "bash", code: "jq '[.[] | {title, url}]' | head -5" });
+// fetch PRs with node, filter with bash — developer threads stdout explicitly
+const prResult = await exec({ runtime: "node", code: `
+  import { listPullRequests } from '@mcp/github';
+  return JSON.stringify(await listPullRequests({ state: 'open' }));
+`});
+
+const filtered = await exec({
+  runtime: "bash",
+  code: `echo '${prResult.stdout}' | jq '[.[] | select(.labels[] == "needs-review") | .url]'`,
+});
 ```
 
 This enables the agent to compose MCP orchestration (node/python) with unix-style
@@ -453,30 +497,39 @@ The full explicit session surface:
 
 ### Session internals
 
-Each session is a persistent Node.js `vm.Context` kept alive between `exec` calls for
-the session's lifetime. `globalThis` in that context survives across calls — this is how
-`globalThis.prs` set in call 1 is available in call 2. The sandbox subprocess for each
-call runs inside this persistent context.
+Each session is a persistent Node.js `vm.Context` kept alive in the mcp-exec server
+process between `exec` calls. `globalThis` in that context survives across calls — this
+is how `globalThis.prs` set in call 1 is available in call 2. srt applies OS-level
+network and filesystem restrictions to the mcp-exec process itself; the vm.Context is
+the in-process state store, separate from srt's role.
+
+**Cross-runtime state:** `globalThis.*` persistence is Node-only. Bash and Python exec
+calls run as stateless subprocesses — they cannot read Node session globals. Share data
+between runtimes by threading it explicitly through `result.stdout` in the callback.
 
 ```typescript
-// call 1 — fetch and store
+// call 1 — fetch and store (Node)
 await exec({ runtime: "node", code: `
-  import { github } from 'mcp/github';
-  globalThis.prs = await github.listPRs({ state: 'open' });
+  import { listPullRequests } from '@mcp/github';
+  globalThis.prs = await listPullRequests({ state: 'open' });
   return globalThis.prs.length + ' PRs fetched';
 `});
 
-// call 2 — use stored state
+// call 2 — use stored state (Node, same session)
 await exec({ runtime: "node", code: `
   const flagged = globalThis.prs.filter(pr => pr.labels.includes('needs-review'));
-  return flagged.map(pr => pr.url);
+  return JSON.stringify(flagged.map(pr => pr.url));
 `});
 
-// chained — single expression, fetch + trim
-await exec({ runtime: "node", code: `
-  import { github } from 'mcp/github';
-  return await github.listPRs({ state: 'open' });
-`}).then({ runtime: "bash", code: "jq '[.[] | select(.labels[] == \"needs-review\") | .url]'" });
+// cross-runtime — thread data explicitly via stdout
+const nodeResult = await exec({ runtime: "node", code: `
+  import { listPullRequests } from '@mcp/github';
+  return JSON.stringify(await listPullRequests({ state: 'open' }));
+`});
+const bashResult = await exec({
+  runtime: "bash",
+  code: `echo '${nodeResult.stdout}' | jq '[.[] | select(.labels[] == "needs-review") | .url]'`,
+});
 ```
 
 ---
@@ -530,7 +583,9 @@ the `tool_calls` schema, and the planned plugin compatibility checker (`v0.2`).
 - Generic MCP client shim generator (any MCP-compliant server)
 - `tools(query)` with whitespace-split AND substring matching over lazily-loaded catalog
 - `ts-sdk-reference.md` in skills — pre-processed TypeScript MCP SDK docs
-- Structured error surfacing: exceptions → `{ error, line, column }` to Claude
+- Structured error surfacing: exceptions → `{ error, line, column }` to Claude;
+  `line`/`column` are adjusted to subtract the injected preamble offset so they
+  reflect the user's code, not the wrapped execution context
 - `npx mcp-exec check-plugins` — scans `~/.claude/settings.json` hooks, identifies
   ones watching downstream MCP tool names, prints compatibility report
 
@@ -582,8 +637,14 @@ Additional:
 | Runtime abstraction? | Yes — Node.js + Bash in v0.1, Python added in v0.3. String shorthand or configured instance. |
 | Persistent sessions? | Yes — implicit by default (stdio = one process = one session), explicit `session_id` for named/parallel/forked sessions. |
 | `runtime` vs `language`? | `runtime` — selecting an execution environment, not a programming language. `"node"` not `"typescript"`. |
-| Thenable chaining? | Yes — `exec({...}).then({...})` pipes stdout; genuinely thenable so `await` resolves to final output |
+| Thenable chaining? | `exec()` returns a real `Promise<ExecResult>` — standard `.then()`, no auto-piping. Developer threads stdout explicitly in callback. |
 | Auth flow? | Full process env inherited by sandbox — no config required. All env vars are in scope for the session lifetime (per-invocation scoping deferred). |
-| Code bugs in sandbox? | Caught, returned as `{ error, line, column }`; Claude retries inline |
+| Code bugs in sandbox? | Caught, returned as `{ error, line, column }` with preamble offset subtracted; Claude retries inline |
 | Per-invocation credential scoping? | Deferred. Full process env inherited by sandbox. All declared server env vars are in scope for the session. Documented as known limitation. |
-| Import resolution mechanism? | Node.js `module.register()` loader hooks (`resolve` + `load`). Intercepts `mcp/*` specifiers, returns dynamically generated source. No files on disk. |
+| Import resolution mechanism? | Node.js `module.register()` loader hooks + `vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER` (Node 20.12+). Generates named exports per tool from the server's tool list. No files on disk. |
+| Session / sandbox boundary? | vm.Context lives in the mcp-exec server process (state persistence). srt applies OS-level restrictions to the mcp-exec process at startup. These are separate concerns. |
+| Tool query matching? | Whitespace-tokenized AND match; camelCase tool names split into words; stop words stripped; quoted strings = exact phrase; no max result count. |
+| `mcp-exec.config.json`? | Not a real file. mcp-exec reads CC's `.claude/mcp.json` directly to discover downstream servers. No separate config file. Auth via env vars already present in the shell environment. |
+| Code wrapping? | Node user code wrapped in async IIFE: `const __r = await (async () => { ${code} })()`. Top-level `return` is valid; return value → `result`. Preamble = 1 line; error `line` adjusted by −1. |
+| ExecResult shape? | Internal type: `{ result, stdout, stderr, exitCode, tool_calls }`. MCP exposes only `{ result, tool_calls }`. `result` = IIFE return value (Node) or stdout (Bash/Python). `stdout` used for internal data threading. |
+| Per-call runtime sandbox config? | Not supported. Sandbox policy is global (settings.json only), initialized once at srt startup. Per-call config is limited to `timeout` and `env` overrides. `new Node({ sandbox: {...} })` removed. |
