@@ -427,7 +427,7 @@ npm run typecheck   # tsc --noEmit
 npm run lint        # biome check
 ```
 
-Issue tracking: `bd ready` (requires [beads](https://github.com/joeblackwaslike/beads)).
+Issue tracking: `bd ready` (requires beads).
 
 ## License
 
