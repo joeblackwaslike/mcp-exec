@@ -37,6 +37,18 @@ describe('runInNode', () => {
     expect(result.result).toMatch(/"line":1/);
   });
 
+  it('adjusts line numbers for host-realm Error instances thrown inside the vm', async () => {
+    // vm.runInContext uses a separate realm, so `new Error()` inside vm code fails
+    // `instanceof Error` in the host. Injecting the host Error class lets us test the
+    // adjustLineNumber path (lines 10-12, 62) which is otherwise unreachable.
+    const ctx = sessions.getOrCreate('host-error-realm');
+    ctx.HostError = Error;
+    const result = await runInNode('throw new HostError("host realm error");', ctx);
+    expect(result.exitCode).toBe(1);
+    expect(result.result).toMatch(/host realm error/);
+    expect(result.result).toMatch(/"line":1/);
+  });
+
   it('globalThis state persists across calls to the same context', async () => {
     const ctx = sessions.getOrCreate('persist-test');
     await runInNode('globalThis.counter = 1;', ctx);
