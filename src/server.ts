@@ -66,7 +66,7 @@ async function main() {
 
   // Create MCP server
   const server = new Server(
-    { name: 'mcp-exec', version: '0.2.0' },
+    { name: 'mcp-exec', version: '0.3.0' },
     { capabilities: { tools: {} } },
   );
 
@@ -87,18 +87,22 @@ async function main() {
       {
         name: 'exec',
         description:
-          'Execute code in a sandboxed environment. Only the return value (Node) or stdout (Bash) enters the context window — intermediate data stays in the sandbox.',
+          'Execute code in a sandboxed environment. Only the return value (Node) or stdout (Bash/Python) enters the context window — intermediate data stays in the sandbox.',
         inputSchema: {
           type: 'object',
           properties: {
             code: { type: 'string', description: 'Code to execute' },
             runtime: {
               oneOf: [
-                { type: 'string', enum: ['node', 'bash'], description: 'Runtime shorthand' },
+                {
+                  type: 'string',
+                  enum: ['node', 'bash', 'python'],
+                  description: 'Runtime shorthand',
+                },
                 {
                   type: 'object',
                   properties: {
-                    type: { type: 'string', enum: ['node', 'bash'] },
+                    type: { type: 'string', enum: ['node', 'bash', 'python'] },
                     timeout: { type: 'number', description: 'Timeout in milliseconds' },
                     env: { type: 'object', additionalProperties: { type: 'string' } },
                   },
