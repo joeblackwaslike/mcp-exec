@@ -64,6 +64,32 @@ Reviews were dispatched for Tasks 3–6. Tasks 7–10 relied on full test suite 
 
 ---
 
+## Session: 2026-04-20–21 (v0.2 implementation + PR review)
+
+v0.2 was implemented entirely in the host conversation — subagent-driven-development skill was not followed. Logged as a process failure; v0.3 will use the correct workflow.
+
+### Implementation
+
+All v0.2 work (dynamic catalog, graceful server failures, check-plugins CLI, E2E tests, ts-sdk-reference) was done in a single host conversation. No subagent token data available.
+
+### PR review fixes (2026-04-21)
+
+PR joeblackwaslike/mcp-exec#4 received reviews from Gemini, Sourcery, Codex, and LlamaPReview. 7 bugs fixed, 3 items pushed back.
+
+| Fix | Files |
+|-----|-------|
+| `wrapClients` dead conditional removed | `src/sandbox/index.ts` |
+| `generateSource` identifier sanitization (`toIdentifier()`) | `src/loader/sources.ts` |
+| `generateUnavailableSource` top-level throw for named import support | `src/loader/sources.ts` |
+| Hook merging per-event array concat (was shallow spread) | `src/cli/check-plugins.ts` |
+| argv gate `realpathSync` for symlinked `.bin` paths | `src/cli/check-plugins.ts` |
+| `matcher.includes(name + '__')` false-positive fix | `src/cli/check-plugins.ts` |
+| Typo "bash" → "Bash" | `skills/ts-sdk-reference.md` |
+
+Host conversation tokens for both sessions: not available client-side.
+
+---
+
 ## Notes
 
 - Haiku used for Tasks 3–10: isolated, single-file, fully-specced tasks. Fast and cheap.
