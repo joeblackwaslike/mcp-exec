@@ -1,28 +1,43 @@
 import { describe, expect, it } from 'vitest';
-import { generateSource, HARDCODED_SERVERS } from './sources.js';
+import { generateSource, generateUnavailableSource } from './sources.js';
+
+const sampleTools = [{ name: 'listPullRequests' }, { name: 'createIssue' }];
 
 describe('generateSource', () => {
-  it('lists Gmail and GDrive as hardcoded servers', () => {
-    expect(HARDCODED_SERVERS).toContain('gmail');
-    expect(HARDCODED_SERVERS).toContain('gdrive');
+  it('generates a named export for each tool', () => {
+    const source = generateSource('github', sampleTools);
+    expect(source).toContain('export async function listPullRequests');
+    expect(source).toContain('export async function createIssue');
   });
 
-  it('generates a module with named exports for each tool', () => {
-    const source = generateSource('gmail');
-    expect(source).toContain('export async function searchEmails');
-    expect(source).toContain("globalThis.__mcpClients['gmail'].callTool('searchEmails'");
+  it('routes each tool call through globalThis.__mcpClients', () => {
+    const source = generateSource('github', sampleTools);
+    expect(source).toContain("globalThis.__mcpClients['github'].callTool('listPullRequests'");
+    expect(source).toContain("globalThis.__mcpClients['github'].callTool('createIssue'");
   });
 
-  it('throws for unknown server', () => {
-    expect(() => generateSource('unknown')).toThrow('No hardcoded source for server: unknown');
-  });
-
-  it('generated source is valid ESM (no syntax errors)', () => {
-    // Verify source is non-empty and contains expected exports
-    // (new Function() doesn't support export statements, so we validate content instead)
-    const source = generateSource('gmail');
-    expect(source).toBeTruthy();
-    expect(source.length).toBeGreaterThan(0);
+  it('produces valid ESM with export keywords', () => {
+    const source = generateSource('github', sampleTools);
     expect(source).toMatch(/export async function/);
+    expect(source.length).toBeGreaterThan(0);
+  });
+
+  it('generates empty module for server with no tools', () => {
+    const source = generateSource('empty-server', []);
+    expect(source).toBe('');
+  });
+});
+
+describe('generateUnavailableSource', () => {
+  it('generates a module that throws on any named import call', () => {
+    const source = generateUnavailableSource('slack', 'ENOENT: binary not found');
+    expect(source).toContain('export');
+    expect(source).toContain('slack');
+    expect(source).toContain('unavailable');
+  });
+
+  it('includes the reason in the thrown error', () => {
+    const source = generateUnavailableSource('slack', 'connection refused');
+    expect(source).toContain('connection refused');
   });
 });

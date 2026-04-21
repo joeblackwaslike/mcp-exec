@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import type { UnavailableServer } from '../types.js';
 
 export interface McpServerConfig {
   command: string;
@@ -10,6 +11,11 @@ export interface McpServerConfig {
 }
 
 export type McpClientMap = Record<string, Client>;
+
+export interface ConnectResult {
+  clients: McpClientMap;
+  unavailable: UnavailableServer[];
+}
 
 interface McpJson {
   mcpServers?: Record<string, McpServerConfig>;
@@ -27,22 +33,26 @@ export function readMcpConfig(cwd = process.cwd()): Record<string, McpServerConf
 }
 
 /**
- * Connects to the named downstream MCP servers and returns a client map.
- * Connections are established in parallel.
+ * Connects to the named downstream MCP servers using Promise.allSettled.
+ * Servers that fail to connect (or are not configured) are returned in
+ * `unavailable` with a reason — the server stays alive for the rest.
  */
 export async function connectMcpClients(
   serverNames: string[],
   cwd = process.cwd(),
-): Promise<McpClientMap> {
+): Promise<ConnectResult> {
   const configs = readMcpConfig(cwd);
-  const entries = await Promise.all(
+  const clients: McpClientMap = {};
+  const unavailable: UnavailableServer[] = [];
+
+  const results = await Promise.allSettled(
     serverNames.map(async (name) => {
       const config = configs[name];
       if (!config) {
-        return [name, null] as const;
+        throw new Error(`not configured in mcp.json`);
       }
 
-      const client = new Client({ name: `mcp-exec/${name}`, version: '0.1.0' }, {});
+      const client = new Client({ name: `mcp-exec/${name}`, version: '0.2.0' }, {});
       const transport = new StdioClientTransport({
         command: config.command,
         args: config.args ?? [],
@@ -54,9 +64,21 @@ export async function connectMcpClients(
       });
 
       await client.connect(transport);
-      return [name, client] as const;
+      return { name, client };
     }),
   );
 
-  return Object.fromEntries(entries.filter(([, client]) => client !== null)) as McpClientMap;
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const name = serverNames[i];
+    if (result.status === 'fulfilled') {
+      clients[result.value.name] = result.value.client;
+    } else {
+      const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
+      process.stderr.write(`[mcp-exec] Warning: failed to connect to '${name}': ${reason}\n`);
+      unavailable.push({ server: name, status: 'unavailable', reason });
+    }
+  }
+
+  return { clients, unavailable };
 }

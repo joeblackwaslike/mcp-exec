@@ -1,11 +1,12 @@
 {
   "name": "mcp-exec",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "MCP server for sandboxed code execution with context window reduction",
   "bin": {
     "mcp-exec": "./dist/src/server.js",
-    "mcp-exec-install-skill": "./dist/bin/install-skill.js"
+    "mcp-exec-install-skill": "./dist/bin/install-skill.js",
+    "mcp-exec-check-plugins": "./dist/src/cli/check-plugins.js"
   },
   "scripts": {
     "dev": "tsx src/server.ts",

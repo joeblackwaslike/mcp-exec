@@ -1,59 +1,102 @@
-import { describe, expect, it } from 'vitest';
-import { getAllTools, searchTools } from './index.js';
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { ToolSummary, UnavailableServer } from '../types.js';
+import { getAllTools, searchTools, setCatalog } from './index.js';
+
+const sampleTools: ToolSummary[] = [
+  {
+    server: 'github',
+    name: 'listPullRequests',
+    description: 'List open pull requests',
+    signature: 'listPullRequests(state?: string): PR[]',
+  },
+  {
+    server: 'github',
+    name: 'createIssue',
+    description: 'Create a new issue',
+    signature: 'createIssue(title: string, body?: string): Issue',
+  },
+  {
+    server: 'gdrive',
+    name: 'searchFiles',
+    description: 'Search Drive files by name or content',
+    signature: 'searchFiles(query: string): File[]',
+  },
+];
+
+const sampleUnavailable: UnavailableServer[] = [
+  { server: 'slack', status: 'unavailable', reason: 'ENOENT: slack-mcp not found' },
+];
+
+beforeEach(() => {
+  setCatalog(sampleTools, sampleUnavailable);
+});
 
 describe('getAllTools', () => {
-  it('returns tools for gmail and gdrive', () => {
-    const tools = getAllTools();
-    const servers = [...new Set(tools.map((t) => t.server))];
-    expect(servers).toContain('gmail');
-    expect(servers).toContain('gdrive');
+  it('returns all tools from the catalog', () => {
+    const entries = getAllTools();
+    const tools = entries.filter((e): e is ToolSummary => !('status' in e));
+    expect(tools).toHaveLength(3);
+  });
+
+  it('includes unavailable server entries', () => {
+    const entries = getAllTools();
+    const unavailable = entries.filter((e): e is UnavailableServer => 'status' in e);
+    expect(unavailable).toHaveLength(1);
+    expect(unavailable[0].server).toBe('slack');
+    expect(unavailable[0].reason).toContain('ENOENT');
+  });
+
+  it('returns empty catalog before setCatalog is called', () => {
+    setCatalog([], []);
+    expect(getAllTools()).toHaveLength(0);
   });
 });
 
 describe('searchTools', () => {
-  it('returns all tools for "*"', () => {
-    const all = getAllTools();
+  it('returns all tools and unavailable entries for "*"', () => {
     const results = searchTools('*');
-    expect(results.length).toBe(all.length);
+    expect(results).toHaveLength(sampleTools.length + sampleUnavailable.length);
   });
 
   it('filters by single token matching tool name', () => {
     const results = searchTools('search');
+    const tools = results.filter((e): e is ToolSummary => !('status' in e));
     expect(
-      results.every(
+      tools.every(
         (t) =>
           t.name.toLowerCase().includes('search') || t.description.toLowerCase().includes('search'),
       ),
     ).toBe(true);
-    expect(results.length).toBeGreaterThan(0);
+    expect(tools.length).toBeGreaterThan(0);
   });
 
   it('splits camelCase tool names for matching', () => {
-    // "searchEmails" should match query "emails"
-    const results = searchTools('emails');
-    expect(results.some((t) => t.name === 'searchEmails')).toBe(true);
+    const results = searchTools('pull');
+    const tools = results.filter((e): e is ToolSummary => !('status' in e));
+    expect(tools.some((t) => t.name === 'listPullRequests')).toBe(true);
   });
 
   it('requires all tokens to match (AND logic)', () => {
-    const results = searchTools('search emails');
-    expect(
-      results.every(
-        (t) =>
-          `${t.name} ${t.description}`.toLowerCase().includes('search') ||
-          `${t.name} ${t.description}`.toLowerCase().includes('email'),
-      ),
-    ).toBe(true);
+    const results = searchTools('list pull');
+    const tools = results.filter((e): e is ToolSummary => !('status' in e));
+    expect(tools).toHaveLength(1);
+    expect(tools[0].name).toBe('listPullRequests');
   });
 
   it('strips stop words from query', () => {
-    // "search the emails" should behave like "search emails"
-    const withStop = searchTools('search the emails');
-    const withoutStop = searchTools('search emails');
+    const withStop = searchTools('search the files');
+    const withoutStop = searchTools('search files');
     expect(withStop.length).toBe(withoutStop.length);
   });
 
   it('returns empty array for no matches', () => {
     const results = searchTools('zzznomatch');
     expect(results).toEqual([]);
+  });
+
+  it('does not include unavailable entries for non-wildcard queries', () => {
+    const results = searchTools('slack');
+    const unavailable = results.filter((e) => 'status' in e);
+    expect(unavailable).toHaveLength(0);
   });
 });

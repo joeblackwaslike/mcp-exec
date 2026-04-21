@@ -3,24 +3,13 @@ import { SandboxManager } from '@anthropic-ai/sandbox-runtime';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { searchTools } from './catalog/index.js';
-import { connectMcpClients } from './mcp-clients/index.js';
+import { buildCatalog } from './catalog/builder.js';
+import { searchTools, setCatalog } from './catalog/index.js';
+import { connectMcpClients, readMcpConfig } from './mcp-clients/index.js';
 import { resolveSandboxConfig } from './sandbox/config.js';
 import { createExecDispatcher } from './sandbox/index.js';
 import { SessionManager } from './sandbox/session.js';
 import type { RuntimeParam } from './types.js';
-
-// Register mcp/* loader hooks before any dynamic imports run
-if (process.env.NODE_ENV !== 'test') {
-  try {
-    register('./loader/hooks.js', import.meta.url);
-  } catch (err) {
-    process.stderr.write(`[mcp-exec] Fatal: failed to register loader hooks: ${err}\n`);
-    process.exit(1);
-  }
-}
-
-const V0_1_SERVERS = ['gmail', 'gdrive'];
 
 async function main() {
   // Initialize srt sandbox (skipped in test environments)
@@ -45,17 +34,36 @@ async function main() {
     }
   }
 
-  // Connect downstream MCP clients
-  const mcpClients = await connectMcpClients(V0_1_SERVERS);
+  // Connect all downstream MCP clients from mcp.json (excluding mcp-exec itself)
+  const allServerNames = Object.keys(readMcpConfig()).filter((n) => n !== 'mcp-exec');
+  const { clients, unavailable: connectUnavailable } = await connectMcpClients(allServerNames);
+
+  // Fetch tool lists from connected clients — servers whose listTools fails join unavailable
+  const { tools, unavailable, toolsByServer } = await buildCatalog(clients, connectUnavailable);
+  setCatalog(tools, unavailable);
+
+  // Register loader hooks with the fully-built catalog — must happen before any exec calls
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      const unavailableServers = Object.fromEntries(unavailable.map((u) => [u.server, u.reason]));
+      register('./loader/hooks.js', {
+        parentURL: import.meta.url,
+        data: { toolsByServer, unavailableServers },
+      });
+    } catch (err) {
+      process.stderr.write(`[mcp-exec] Fatal: failed to register loader hooks: ${err}\n`);
+      process.exit(1);
+    }
+  }
 
   // Set up session manager and exec dispatcher
   const sessions = new SessionManager();
   // biome-ignore lint/suspicious/noExplicitAny: McpClientMap (Client) vs duck-type callTool bridge
-  const exec = createExecDispatcher(sessions, mcpClients as any);
+  const exec = createExecDispatcher(sessions, clients as any);
 
   // Create MCP server
   const server = new Server(
-    { name: 'mcp-exec', version: '0.1.0' },
+    { name: 'mcp-exec', version: '0.2.0' },
     { capabilities: { tools: {} } },
   );
 
@@ -64,7 +72,7 @@ async function main() {
       {
         name: 'tools',
         description:
-          'Search available MCP tools. Pass "*" to list all tools, or a query to filter. Returns trimmed summaries — full schemas are never loaded into context.',
+          'Search available MCP tools. Pass "*" to list all tools, or a query to filter. Returns trimmed summaries — full schemas are never loaded into context. Unavailable servers appear with status "unavailable" and a reason.',
         inputSchema: {
           type: 'object',
           properties: {

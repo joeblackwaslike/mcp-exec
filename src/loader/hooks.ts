@@ -1,15 +1,17 @@
-import type { generateSource } from './sources.js';
+import { generateSource, generateUnavailableSource, type ToolRef } from './sources.js';
 
-// This import is evaluated in the loader context, which runs in a separate
-// worker thread. We use a dynamic import to get the source generator.
-let _generateSource: typeof generateSource | null = null;
+interface LoaderData {
+  toolsByServer: Record<string, ToolRef[]>;
+  unavailableServers: Record<string, string>;
+}
 
-async function getGenerateSource() {
-  if (!_generateSource) {
-    const mod = await import('./sources.js');
-    _generateSource = mod.generateSource;
-  }
-  return _generateSource;
+let toolsByServer: Record<string, ToolRef[]> = {};
+let unavailableServers: Record<string, string> = {};
+
+/** Called once by Node when the loader worker starts, with data from module.register() */
+export function initialize(data: LoaderData): void {
+  toolsByServer = data.toolsByServer;
+  unavailableServers = data.unavailableServers;
 }
 
 export async function resolve(
@@ -33,9 +35,24 @@ export async function load(
 ): Promise<{ source: string; format: string; shortCircuit?: boolean }> {
   if (url.startsWith('virtual:mcp/')) {
     const serverName = url.replace('virtual:mcp/', '');
-    const gen = await getGenerateSource();
-    const source = gen(serverName);
-    return { shortCircuit: true, format: 'module', source };
+
+    if (serverName in unavailableServers) {
+      return {
+        shortCircuit: true,
+        format: 'module',
+        source: generateUnavailableSource(serverName, unavailableServers[serverName]),
+      };
+    }
+
+    if (serverName in toolsByServer) {
+      return {
+        shortCircuit: true,
+        format: 'module',
+        source: generateSource(serverName, toolsByServer[serverName]),
+      };
+    }
+
+    throw new Error(`[mcp-exec] No source for server: '${serverName}' — not in catalog`);
   }
   return nextLoad(url, context);
 }
