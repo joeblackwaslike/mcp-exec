@@ -27,7 +27,7 @@ export type ToolCallRecord = {
 
 /** Internal result type — superset of what MCP exposes */
 export type ExecResult = {
-  /** Primary output sent to Claude: IIFE return value (Node) or stdout (Bash) */
+  /** Primary output sent to Claude: IIFE return value (Node) or stdout (Bash/Python) */
   result: unknown;
   /** Raw stdout — used internally for cross-runtime data threading */
   stdout: string;
@@ -40,4 +40,5 @@ export type ExecResult = {
 export type RuntimeParam =
   | 'node'
   | 'bash'
-  | { type: 'node' | 'bash'; timeout?: number; env?: Record<string, string> };
+  | 'python'
+  | { type: 'node' | 'bash' | 'python'; timeout?: number; env?: Record<string, string> };

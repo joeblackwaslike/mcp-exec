@@ -18,6 +18,13 @@ describe('createExecDispatcher', () => {
     expect(result.result).toContain('hi');
   });
 
+  it('routes "python" runtime to Python execution', async () => {
+    const sessions = new SessionManager();
+    const exec = createExecDispatcher(sessions, {});
+    const result = await exec({ code: 'print("hello")', runtime: 'python' });
+    expect(result.result).toContain('hello');
+  });
+
   it('accepts config object with type field', async () => {
     const sessions = new SessionManager();
     const exec = createExecDispatcher(sessions, {});
@@ -39,8 +46,8 @@ describe('createExecDispatcher', () => {
     const sessions = new SessionManager();
     const exec = createExecDispatcher(sessions, {});
     // biome-ignore lint/suspicious/noExplicitAny: testing unsupported runtime rejection
-    await expect(exec({ code: 'print("hi")', runtime: 'python' as any })).rejects.toThrow(
-      'Unsupported runtime: python',
+    await expect(exec({ code: 'puts "hi"', runtime: 'ruby' as any })).rejects.toThrow(
+      'Unsupported runtime: ruby',
     );
   });
 });
