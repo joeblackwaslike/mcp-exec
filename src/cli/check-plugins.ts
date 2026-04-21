@@ -1,6 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export interface HookCommand {
   type: string;
@@ -39,7 +40,7 @@ export function findAffectedHooks(
       const matcher = entry.matcher ?? '';
       if (!matcher || matcher === '*') continue;
 
-      const matchedServer = serverNames.find((name) => matcher.includes(name));
+      const matchedServer = serverNames.find((name) => matcher.includes(`${name}__`));
       if (!matchedServer) continue;
 
       affected.push({
@@ -78,10 +79,13 @@ export function main(cwd = process.cwd()): void {
     return;
   }
 
-  const allHooks = {
-    ...((globalSettings.hooks as Record<string, HookEntry[]> | undefined) ?? {}),
-    ...((projectSettings.hooks as Record<string, HookEntry[]> | undefined) ?? {}),
-  };
+  const globalHooks = (globalSettings.hooks as Record<string, HookEntry[]> | undefined) ?? {};
+  const projectHooks = (projectSettings.hooks as Record<string, HookEntry[]> | undefined) ?? {};
+  const allEvents = new Set([...Object.keys(globalHooks), ...Object.keys(projectHooks)]);
+  const allHooks: Record<string, HookEntry[]> = {};
+  for (const event of allEvents) {
+    allHooks[event] = [...(globalHooks[event] ?? []), ...(projectHooks[event] ?? [])];
+  }
 
   const affected = findAffectedHooks(allHooks, serverNames);
 
@@ -114,6 +118,10 @@ export function main(cwd = process.cwd()): void {
   process.stdout.write('  See docs/DEVELOPER.md for the tool_calls schema and migration guide.\n');
 }
 
-if (process.argv[1] === new URL(import.meta.url).pathname) {
-  main();
+try {
+  if (realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+    main();
+  }
+} catch {
+  // argv[1] may not be a resolvable path in some environments; skip auto-run
 }

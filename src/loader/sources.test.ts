@@ -26,12 +26,18 @@ describe('generateSource', () => {
     const source = generateSource('empty-server', []);
     expect(source).toBe('');
   });
+
+  it('sanitizes hyphenated tool names to valid JS identifiers', () => {
+    const source = generateSource('github', [{ name: 'list-pull-requests' }]);
+    expect(source).toContain('export async function list_pull_requests');
+    expect(source).toContain("callTool('list-pull-requests'");
+  });
 });
 
 describe('generateUnavailableSource', () => {
-  it('generates a module that throws on any named import call', () => {
+  it('generates a top-level throw so any import surfaces the error', () => {
     const source = generateUnavailableSource('slack', 'ENOENT: binary not found');
-    expect(source).toContain('export');
+    expect(source).toMatch(/^throw new Error\(/);
     expect(source).toContain('slack');
     expect(source).toContain('unavailable');
   });

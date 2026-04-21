@@ -54,6 +54,11 @@ describe('findAffectedHooks', () => {
     expect(findAffectedHooks(hooks, serverNames)).toHaveLength(0);
   });
 
+  it('does not flag a server name that is a substring of another (e.g. "git" vs "github")', () => {
+    const hooks = makeHooks('PreToolUse', 'github__createIssue');
+    expect(findAffectedHooks(hooks, ['git'])).toHaveLength(0);
+  });
+
   it('flags multiple hooks across events', () => {
     const hooks = {
       PreToolUse: [

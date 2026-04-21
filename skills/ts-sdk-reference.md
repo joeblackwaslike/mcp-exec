@@ -117,7 +117,7 @@ const [emails, files] = await Promise.all([
 return JSON.stringify({ emails, files });
 ```
 
-### Thread data to bash for post-processing
+### Thread data to Bash for post-processing
 ```typescript
 // exec 1 (node) — fetch and return raw JSON
 import { listPullRequests } from 'mcp/github';
