@@ -1,11 +1,20 @@
-import { describe, expect, it, vi } from 'vitest';
-import { load, resolve } from './hooks.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { initialize, load, resolve } from './hooks.js';
+
+const githubTools = [{ name: 'listPullRequests' }, { name: 'createIssue' }];
+
+beforeEach(() => {
+  initialize({
+    toolsByServer: { github: githubTools },
+    unavailableServers: { slack: 'ENOENT: slack-mcp not found' },
+  });
+});
 
 describe('resolve', () => {
   it('intercepts mcp/* specifiers and redirects to virtual: URL', async () => {
     const nextResolve = vi.fn();
-    const result = await resolve('mcp/gmail', {}, nextResolve);
-    expect(result).toEqual({ url: 'virtual:mcp/gmail', shortCircuit: true });
+    const result = await resolve('mcp/github', {}, nextResolve);
+    expect(result).toEqual({ url: 'virtual:mcp/github', shortCircuit: true });
     expect(nextResolve).not.toHaveBeenCalled();
   });
 
@@ -25,17 +34,25 @@ describe('resolve', () => {
 });
 
 describe('load', () => {
-  it('generates ESM module source for virtual:mcp/* URLs', async () => {
+  it('generates ESM module source for a known server', async () => {
     const nextLoad = vi.fn();
-    const result = await load('virtual:mcp/gmail', {}, nextLoad);
+    const result = await load('virtual:mcp/github', {}, nextLoad);
     expect(result.format).toBe('module');
     expect(result.shortCircuit).toBe(true);
-    expect(typeof result.source).toBe('string');
-    expect(result.source).toContain('export');
+    expect(result.source).toContain('export async function listPullRequests');
     expect(nextLoad).not.toHaveBeenCalled();
   });
 
-  it('throws for unknown server names', async () => {
+  it('generates an error-throwing module for unavailable servers', async () => {
+    const nextLoad = vi.fn();
+    const result = await load('virtual:mcp/slack', {}, nextLoad);
+    expect(result.format).toBe('module');
+    expect(result.source).toContain('unavailable');
+    expect(result.source).toContain('slack');
+    expect(nextLoad).not.toHaveBeenCalled();
+  });
+
+  it('throws for servers not in toolsByServer or unavailable', async () => {
     const nextLoad = vi.fn();
     await expect(load('virtual:mcp/unknown-server-xyz', {}, nextLoad)).rejects.toThrow();
   });

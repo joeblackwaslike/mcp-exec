@@ -7,6 +7,16 @@ export type ToolSummary = {
   signature: string;
 };
 
+/** Server that failed to connect or whose tool listing failed */
+export type UnavailableServer = {
+  server: string;
+  status: 'unavailable';
+  reason: string;
+};
+
+/** Entry returned by tools(query) — either a usable tool or an unavailable server notice */
+export type CatalogEntry = ToolSummary | UnavailableServer;
+
 /** Record of a downstream tool call made inside exec() */
 export type ToolCallRecord = {
   server: string;

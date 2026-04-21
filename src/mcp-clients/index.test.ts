@@ -3,9 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
+const mockConnect = vi.fn().mockResolvedValue(undefined);
+
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
   Client: vi.fn().mockImplementation(() => ({
-    connect: vi.fn().mockResolvedValue(undefined),
+    connect: mockConnect,
   })),
 }));
 
@@ -14,6 +16,14 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
 }));
 
 import { connectMcpClients, readMcpConfig } from './index.js';
+
+function makeTmpWithServers(servers: Record<string, { command: string; args?: string[] }>) {
+  const tmpDir = mkdtempSync(join(tmpdir(), 'mcp-exec-clients-test-'));
+  const claudeDir = join(tmpDir, '.claude');
+  mkdirSync(claudeDir);
+  writeFileSync(join(claudeDir, 'mcp.json'), JSON.stringify({ mcpServers: servers }));
+  return tmpDir;
+}
 
 describe('readMcpConfig', () => {
   it('returns empty object when mcp.json does not exist', () => {
@@ -47,27 +57,21 @@ describe('readMcpConfig', () => {
 });
 
 describe('connectMcpClients', () => {
-  function makeTmpWithServers(servers: Record<string, { command: string; args?: string[] }>) {
+  it('puts servers missing from mcp.json into unavailable (not a crash)', async () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'mcp-exec-clients-test-'));
-    const claudeDir = join(tmpDir, '.claude');
-    mkdirSync(claudeDir);
-    writeFileSync(join(claudeDir, 'mcp.json'), JSON.stringify({ mcpServers: servers }));
-    return tmpDir;
-  }
-
-  it('returns empty map when requested servers are missing from mcp.json', async () => {
-    const tmpDir = mkdtempSync(join(tmpdir(), 'mcp-exec-clients-test-'));
-    const map = await connectMcpClients(['gmail'], tmpDir);
-    expect(Object.keys(map)).toHaveLength(0);
+    const result = await connectMcpClients(['gmail'], tmpDir);
+    expect(Object.keys(result.clients)).toHaveLength(0);
+    expect(result.unavailable).toHaveLength(1);
+    expect(result.unavailable[0].server).toBe('gmail');
   });
 
-  it('connects to a server listed in mcp.json and returns it in the client map', async () => {
+  it('returns connected client in clients map', async () => {
     const tmpDir = makeTmpWithServers({
       gmail: { command: 'npx', args: ['-y', '@gargr/gmail-mcp'] },
     });
-    const map = await connectMcpClients(['gmail'], tmpDir);
-    expect(Object.keys(map)).toContain('gmail');
-    expect(map.gmail).toBeDefined();
+    const result = await connectMcpClients(['gmail'], tmpDir);
+    expect(result.clients.gmail).toBeDefined();
+    expect(result.unavailable).toHaveLength(0);
   });
 
   it('connects to multiple servers in parallel', async () => {
@@ -75,17 +79,44 @@ describe('connectMcpClients', () => {
       gmail: { command: 'npx', args: ['-y', '@gargr/gmail-mcp'] },
       gdrive: { command: 'npx', args: ['-y', '@gargr/gdrive-mcp'] },
     });
-    const map = await connectMcpClients(['gmail', 'gdrive'], tmpDir);
-    expect(Object.keys(map)).toContain('gmail');
-    expect(Object.keys(map)).toContain('gdrive');
+    const result = await connectMcpClients(['gmail', 'gdrive'], tmpDir);
+    expect(Object.keys(result.clients)).toContain('gmail');
+    expect(Object.keys(result.clients)).toContain('gdrive');
+    expect(result.unavailable).toHaveLength(0);
   });
 
-  it('skips servers not found in mcp.json without failing', async () => {
+  it('puts servers missing from mcp.json into unavailable alongside successful ones', async () => {
     const tmpDir = makeTmpWithServers({
       gmail: { command: 'npx', args: ['-y', '@gargr/gmail-mcp'] },
     });
-    const map = await connectMcpClients(['gmail', 'nonexistent'], tmpDir);
-    expect(Object.keys(map)).toContain('gmail');
-    expect(Object.keys(map)).not.toContain('nonexistent');
+    const result = await connectMcpClients(['gmail', 'nonexistent'], tmpDir);
+    expect(Object.keys(result.clients)).toContain('gmail');
+    expect(result.unavailable).toHaveLength(1);
+    expect(result.unavailable[0].server).toBe('nonexistent');
+    expect(result.unavailable[0].status).toBe('unavailable');
+  });
+
+  it('puts servers that fail to connect into unavailable with reason', async () => {
+    mockConnect.mockRejectedValueOnce(new Error('ENOENT: binary not found'));
+    const tmpDir = makeTmpWithServers({
+      slack: { command: 'slack-mcp', args: [] },
+      github: { command: 'github-mcp', args: [] },
+    });
+    const result = await connectMcpClients(['slack', 'github'], tmpDir);
+    const unavailableNames = result.unavailable.map((u) => u.server);
+    expect(unavailableNames).toContain('slack');
+    expect(result.unavailable.find((u) => u.server === 'slack')?.reason).toContain('ENOENT');
+    expect(Object.keys(result.clients)).toContain('github');
+  });
+
+  it('returns all servers as unavailable when all connections fail', async () => {
+    mockConnect.mockRejectedValue(new Error('connection refused'));
+    const tmpDir = makeTmpWithServers({
+      slack: { command: 'slack-mcp', args: [] },
+    });
+    const result = await connectMcpClients(['slack'], tmpDir);
+    expect(Object.keys(result.clients)).toHaveLength(0);
+    expect(result.unavailable).toHaveLength(1);
+    mockConnect.mockResolvedValue(undefined);
   });
 });

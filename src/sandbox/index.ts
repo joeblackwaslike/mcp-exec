@@ -9,12 +9,39 @@ interface ExecOptions {
   session_id?: string;
 }
 
-type McpClientMap = Record<
+/** Duck-type interface expected by generated shims: callTool(name, params) */
+type ShimClientMap = Record<
   string,
   { callTool: (name: string, params?: unknown) => Promise<unknown> }
 >;
 
-export function createExecDispatcher(sessions: SessionManager, mcpClients: McpClientMap) {
+/** Real MCP SDK Client.callTool shape: callTool({ name, arguments }) */
+interface SdkClient {
+  callTool(request: { name: string; arguments?: Record<string, unknown> }): Promise<unknown>;
+}
+
+/** Adapts real MCP SDK clients to the two-argument duck-type interface expected by shims. */
+function wrapClients(clients: Record<string, SdkClient>): ShimClientMap {
+  return Object.fromEntries(
+    Object.entries(clients).map(([name, client]) => [
+      name,
+      {
+        callTool: (toolName: string, params?: unknown) =>
+          client.callTool({
+            name: toolName,
+            arguments: params as Record<string, unknown> | undefined,
+          }),
+      },
+    ]),
+  );
+}
+
+export function createExecDispatcher(
+  sessions: SessionManager,
+  mcpClients: Record<string, SdkClient>,
+) {
+  const shimClients = wrapClients(mcpClients);
+
   return async function exec(opts: ExecOptions): Promise<ExecResult> {
     const { code, runtime, session_id } = opts;
     const type = typeof runtime === 'string' ? runtime : runtime.type;
@@ -22,7 +49,7 @@ export function createExecDispatcher(sessions: SessionManager, mcpClients: McpCl
     const env = typeof runtime === 'object' ? runtime.env : undefined;
 
     if (type === 'node') {
-      const context = sessions.getOrCreate(session_id, mcpClients);
+      const context = sessions.getOrCreate(session_id, shimClients);
       return runInNode(code, context, { timeout });
     }
 
