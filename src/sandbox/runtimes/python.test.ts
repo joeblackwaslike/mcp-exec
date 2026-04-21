@@ -21,7 +21,9 @@ describe('runInPython', () => {
   });
 
   it('is stateless — variables do not persist between calls', async () => {
-    await runInPython('x = 42');
+    const first = await runInPython('x = 42\nprint("set")');
+    expect(first.exitCode).toBe(0);
+    expect(first.stdout).toContain('set');
     const result = await runInPython('print(x)');
     expect(result.exitCode).not.toBe(0);
     expect(result.stderr).toContain('NameError');

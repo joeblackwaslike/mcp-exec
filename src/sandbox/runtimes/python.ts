@@ -33,30 +33,43 @@ function spawnPython(
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
+    let settled = false;
+    const settle = (result: ExecResult) => {
+      if (settled) return;
+      settled = true;
+      if (sigkillTimer) clearTimeout(sigkillTimer);
+      if (timer) clearTimeout(timer);
+      resolve(result);
+    };
+
     let timedOut = false;
+    let sigkillTimer: NodeJS.Timeout | null = null;
     const timer = opts.timeout
       ? setTimeout(() => {
           timedOut = true;
           child.kill('SIGTERM');
+          sigkillTimer = setTimeout(() => child.kill('SIGKILL'), 2000);
         }, opts.timeout)
       : null;
 
     child.stdout.on('data', (chunk: Buffer) => stdoutChunks.push(chunk));
     child.stderr.on('data', (chunk: Buffer) => stderrChunks.push(chunk));
 
+    child.on('error', (err) => {
+      settle({
+        result: '',
+        stdout: '',
+        stderr: `Failed to spawn uv: ${err.message}. Is uv installed and on PATH?`,
+        exitCode: 127,
+        tool_calls: [],
+      });
+    });
+
     child.on('close', (code) => {
-      if (timer) clearTimeout(timer);
       const stdout = Buffer.concat(stdoutChunks).toString();
       const stderr = Buffer.concat(stderrChunks).toString();
       const exitCode = timedOut ? 124 : (code ?? 1);
-
-      resolve({
-        result: stdout,
-        stdout,
-        stderr,
-        exitCode,
-        tool_calls: [],
-      });
+      settle({ result: stdout, stdout, stderr, exitCode, tool_calls: [] });
     });
   });
 }

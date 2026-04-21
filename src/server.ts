@@ -143,6 +143,7 @@ async function main() {
             text: JSON.stringify({
               result: result.result,
               tool_calls: result.tool_calls,
+              ...(result.exitCode !== 0 && { stderr: result.stderr, exitCode: result.exitCode }),
             }),
           },
         ],

@@ -112,8 +112,8 @@ return value; // pass as env var in exec 2
 
 ```typescript
 // orchestrating code — pass node result as env var
-// Note: env vars are strings — stringify objects before passing
-exec({ runtime: 'python', code: `...`, env: { INPUT: String(nodeResult.result) } })
+// Note: env vars are strings — use JSON.stringify for objects
+exec({ runtime: 'python', code: `...`, env: { INPUT: JSON.stringify(nodeResult.result) } })
 ```
 
 ```python
