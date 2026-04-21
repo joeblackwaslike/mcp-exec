@@ -11,11 +11,13 @@ import { SessionManager } from './sandbox/session.js';
 import type { RuntimeParam } from './types.js';
 
 // Register mcp/* loader hooks before any dynamic imports run
-try {
-  register('./loader/hooks.js', import.meta.url);
-} catch (err) {
-  process.stderr.write(`[mcp-exec] Fatal: failed to register loader hooks: ${err}\n`);
-  process.exit(1);
+if (process.env.NODE_ENV !== 'test') {
+  try {
+    register('./loader/hooks.js', import.meta.url);
+  } catch (err) {
+    process.stderr.write(`[mcp-exec] Fatal: failed to register loader hooks: ${err}\n`);
+    process.exit(1);
+  }
 }
 
 const V0_1_SERVERS = ['gmail', 'gdrive'];

@@ -34,4 +34,9 @@ describe('runInBash', () => {
     const result = await runInBash('echo $X');
     expect(String(result.result).trim()).toBe('');
   });
+
+  it('kills long-running commands and returns exitCode 124', async () => {
+    const result = await runInBash('sleep 10', { timeout: 200 });
+    expect(result.exitCode).toBe(124);
+  }, 5_000);
 });

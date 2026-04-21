@@ -68,4 +68,52 @@ describe('resolveSandboxConfig', () => {
     vi.mocked(os.homedir).mockReturnValue(tmpDir);
     expect(() => resolveSandboxConfig(tmpDir)).not.toThrow();
   });
+
+  it('reads denyRead from user settings', () => {
+    const userDir = join(tmpDir, '.claude');
+    mkdirSync(userDir, { recursive: true });
+    writeFileSync(
+      join(userDir, 'settings.json'),
+      JSON.stringify({ sandbox: { filesystem: { denyRead: ['/etc/passwd'] } } }),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tmpDir);
+    const config = resolveSandboxConfig(tmpDir);
+    expect(config.filesystem?.denyRead).toContain('/etc/passwd');
+  });
+
+  it('merges denyWrite from user and project settings without duplicates', () => {
+    const userDir = join(tmpDir, '.claude');
+    const projectDir = join(tmpDir, 'project', '.claude');
+    mkdirSync(userDir, { recursive: true });
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(
+      join(userDir, 'settings.json'),
+      JSON.stringify({ sandbox: { filesystem: { denyWrite: ['/etc'] } } }),
+    );
+    writeFileSync(
+      join(projectDir, 'settings.json'),
+      JSON.stringify({ sandbox: { filesystem: { denyWrite: ['/etc', '/usr'] } } }),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tmpDir);
+    const config = resolveSandboxConfig(join(tmpDir, 'project'));
+    expect(config.filesystem?.denyWrite).toEqual(['/etc', '/usr']);
+  });
+
+  it('merges allowRead from user and project settings without duplicates', () => {
+    const userDir = join(tmpDir, '.claude');
+    const projectDir = join(tmpDir, 'project', '.claude');
+    mkdirSync(userDir, { recursive: true });
+    mkdirSync(projectDir, { recursive: true });
+    writeFileSync(
+      join(userDir, 'settings.json'),
+      JSON.stringify({ sandbox: { filesystem: { allowRead: ['/tmp'] } } }),
+    );
+    writeFileSync(
+      join(projectDir, 'settings.json'),
+      JSON.stringify({ sandbox: { filesystem: { allowRead: ['/tmp', '/var/log'] } } }),
+    );
+    vi.mocked(os.homedir).mockReturnValue(tmpDir);
+    const config = resolveSandboxConfig(join(tmpDir, 'project'));
+    expect(config.filesystem?.allowRead).toEqual(['/tmp', '/var/log']);
+  });
 });
