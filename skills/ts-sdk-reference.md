@@ -161,3 +161,39 @@ to handle partial failures within a single exec call.
 - **Explicit session**: pass `session_id` to isolate parallel workflows
 - **Bash/Python**: stateless — no `globalThis` persistence, thread data explicitly via `result.stdout`
 - **Session idle timeout**: 10 minutes (configurable)
+
+---
+
+## Curated Node.js package set
+
+These packages are bundled with mcp-exec and available via `import()`:
+
+| Package | Use case | Import |
+|---|---|---|
+| `zod` | Schema validation / parsing LLM outputs | `import { z } from 'zod'` |
+| `lodash-es` | Data transformation utilities | `import _ from 'lodash-es'` |
+| `date-fns` | Date manipulation | `import { format } from 'date-fns'` |
+| `csv-parse` | CSV ingestion | `import { parse } from 'csv-parse/sync'` |
+| `cheerio` | HTML/XML parsing | `import * as cheerio from 'cheerio'` |
+| `xlsx` | Excel file reading | `import * as XLSX from 'xlsx'` |
+
+Node 22 includes `fetch` natively — no HTTP client package needed.
+
+---
+
+## Threading data to Python
+
+Use a temp file for large payloads, env vars for small ones.
+
+```typescript
+// exec 1 (node) — fetch via MCP, write to temp file
+import { listIssues } from 'mcp/github';
+import { writeFileSync } from 'fs';
+
+const issues = await listIssues({ state: 'open' });
+writeFileSync('/tmp/mcp-exec-issues.json', JSON.stringify(issues));
+return '/tmp/mcp-exec-issues.json';
+
+// exec 2 (python) — read temp file, process with pandas
+// See py-sdk-reference.md for the Python side
+```
