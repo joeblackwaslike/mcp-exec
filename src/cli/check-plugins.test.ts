@@ -2,7 +2,13 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { findAffectedHooks, type HookEntry, main, readJsonFile } from './check-plugins.js';
+import {
+  type AffectedHook,
+  findAffectedHooks,
+  type HookEntry,
+  main,
+  readJsonFile,
+} from './check-plugins.js';
 
 const serverNames = ['github', 'gdrive', 'slack'];
 
@@ -59,8 +65,8 @@ describe('findAffectedHooks', () => {
     };
     const results = findAffectedHooks(hooks, serverNames);
     expect(results).toHaveLength(2);
-    expect(results.map((r) => r.event)).toContain('PreToolUse');
-    expect(results.map((r) => r.event)).toContain('PostToolUse');
+    expect(results.map((r: AffectedHook) => r.event)).toContain('PreToolUse');
+    expect(results.map((r: AffectedHook) => r.event)).toContain('PostToolUse');
   });
 
   it('reports the commands from the affected hook entry', () => {
