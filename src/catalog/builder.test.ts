@@ -80,6 +80,53 @@ describe('buildCatalog', () => {
     expect(result.unavailable[0].server).toBe('pieces');
   });
 
+  it('uses "unknown" when a property has no type field', async () => {
+    const clients = {
+      github: makeClient([
+        {
+          name: 'doThing',
+          description: 'Does a thing',
+          inputSchema: {
+            properties: { id: {} },
+            required: ['id'],
+          },
+        },
+      ]),
+    };
+    const result = await buildCatalog(clients, []);
+    expect(result.tools[0].signature).toBe('doThing(id: unknown): unknown');
+  });
+
+  it('marks all params optional when required array is absent', async () => {
+    const clients = {
+      github: makeClient([
+        {
+          name: 'doThing',
+          description: 'Does a thing',
+          inputSchema: { properties: { id: { type: 'string' }, label: { type: 'string' } } },
+        },
+      ]),
+    };
+    const result = await buildCatalog(clients, []);
+    expect(result.tools[0].signature).toBe('doThing(id?: string, label?: string): unknown');
+  });
+
+  it('falls back to empty string when tool description is absent', async () => {
+    const clients = {
+      github: makeClient([{ name: 'ping' }]),
+    };
+    const result = await buildCatalog(clients, []);
+    expect(result.tools[0].description).toBe('');
+  });
+
+  it('uses String() when rejection reason is not an Error instance', async () => {
+    const clients = {
+      slack: { listTools: vi.fn().mockRejectedValue('timeout string') },
+    };
+    const result = await buildCatalog(clients, []);
+    expect(result.unavailable[0].reason).toBe('timeout string');
+  });
+
   it('builds toolsByServer map alongside tools list', async () => {
     const clients = {
       github: makeClient([

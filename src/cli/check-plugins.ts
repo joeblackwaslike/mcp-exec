@@ -54,7 +54,7 @@ export function findAffectedHooks(
   return affected;
 }
 
-function readJsonFile(path: string): Record<string, unknown> {
+export function readJsonFile(path: string): Record<string, unknown> {
   try {
     return JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
   } catch {
@@ -62,16 +62,19 @@ function readJsonFile(path: string): Record<string, unknown> {
   }
 }
 
-function main() {
+export function main(cwd = process.cwd()): void {
   const globalSettings = readJsonFile(join(homedir(), '.claude', 'settings.json'));
-  const projectSettings = readJsonFile(join(process.cwd(), '.claude', 'settings.json'));
-  const mcpConfig = readJsonFile(join(process.cwd(), '.claude', 'mcp.json'));
+  const projectSettings = readJsonFile(join(cwd, '.claude', 'settings.json'));
+  const mcpConfig = readJsonFile(join(cwd, '.claude', 'mcp.json'));
 
   const serverNames = Object.keys((mcpConfig.mcpServers ?? {}) as Record<string, unknown>).filter(
     (n) => n !== 'mcp-exec',
   );
 
   if (serverNames.length === 0) {
+    process.stdout.write(
+      'mcp-exec check-plugins: no downstream MCP servers found in .claude/mcp.json\n',
+    );
     return;
   }
 
@@ -83,14 +86,32 @@ function main() {
   const affected = findAffectedHooks(allHooks, serverNames);
 
   if (affected.length === 0) {
+    process.stdout.write('✓ mcp-exec check-plugins: no compatibility issues found\n');
     return;
   }
 
+  process.stdout.write(
+    `⚠ mcp-exec check-plugins: ${affected.length} hook(s) watch downstream tool names that won't fire inside exec()\n\n`,
+  );
+  process.stdout.write(
+    '  Calls to these tools via exec() are sandboxed — CC hook events are not emitted for them.\n',
+  );
+  process.stdout.write(
+    '  Use the tool_calls[] field in exec() results for per-tool observability.\n\n',
+  );
+
   for (const hook of affected) {
+    process.stdout.write(
+      `  [${hook.event}] matcher: "${hook.matcher}" (server: ${hook.matchedServer})\n`,
+    );
     for (const cmd of hook.commands) {
-      const _preview = cmd.length > 80 ? `${cmd.slice(0, 77)}...` : cmd;
+      const preview = cmd.length > 80 ? `${cmd.slice(0, 77)}...` : cmd;
+      process.stdout.write(`    command: ${preview}\n`);
     }
+    process.stdout.write('\n');
   }
+
+  process.stdout.write('  See docs/DEVELOPER.md for the tool_calls schema and migration guide.\n');
 }
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {

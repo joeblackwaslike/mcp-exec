@@ -12,8 +12,11 @@ import { SessionManager } from './sandbox/session.js';
 import type { RuntimeParam } from './types.js';
 
 async function main() {
-  // Initialize srt sandbox (skipped in test environments)
-  if (process.env.NODE_ENV !== 'test') {
+  const skipSandbox = process.env.NODE_ENV === 'test' || process.env.SKIP_SANDBOX === '1';
+  const skipLoader = process.env.NODE_ENV === 'test';
+
+  // Initialize srt sandbox (skipped in test/SKIP_SANDBOX environments)
+  if (!skipSandbox) {
     const sandboxConfig = resolveSandboxConfig();
     const hasSandboxBlock =
       (sandboxConfig.network?.allowedDomains?.length ?? 0) > 0 ||
@@ -43,7 +46,7 @@ async function main() {
   setCatalog(tools, unavailable);
 
   // Register loader hooks with the fully-built catalog — must happen before any exec calls
-  if (process.env.NODE_ENV !== 'test') {
+  if (!skipLoader) {
     try {
       const unavailableServers = Object.fromEntries(unavailable.map((u) => [u.server, u.reason]));
       register('./loader/hooks.js', {
