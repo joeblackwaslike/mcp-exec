@@ -1,6 +1,6 @@
 {
   "name": "mcp-exec",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Sandboxed code execution MCP server — keep intermediate results out of the context window",
   "author": "Joe Black",
   "license": "MIT",
@@ -14,13 +14,6 @@
       }
     }
   },
-  "skills": [
-    {
-      "name": "using-mcp-exec",
-      "path": "skills/SKILL.md",
-      "description": "Usage guide for the mcp-exec exec() and tools() tools"
-    }
-  ],
   "commands": [
     {
       "name": "install-skill",

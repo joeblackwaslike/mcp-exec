@@ -1,3 +1,9 @@
+---
+name: Using mcp-exec
+description: Load when using the exec() or tools() MCP tools from mcp-exec — writing sandboxed code, discovering MCP tools, threading data between runtimes
+version: 0.3.0
+---
+
 # mcp-exec
 
 Load this skill when using the `tools` or `exec` MCP tools from mcp-exec.
