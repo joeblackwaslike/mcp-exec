@@ -40,7 +40,8 @@ the context window.
 
 ## Requirements
 
-- Node.js 20.12+ (required for `vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER`)
+- Node.js 22.x LTS (required for `vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER`)
+- Python 3.12.x + `uv` on PATH (required for Python runtime)
 - macOS or Linux (srt uses `sandbox-exec` / `bubblewrap`; Windows not supported)
 - Claude Code 2.1.7+ for full token savings via Tool Search (mcp-exec works without it)
 

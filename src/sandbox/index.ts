@@ -1,6 +1,7 @@
 import type { ExecResult, RuntimeParam } from '../types.js';
 import { runInBash } from './runtimes/bash.js';
 import { runInNode } from './runtimes/node.js';
+import { runInPython } from './runtimes/python.js';
 import type { SessionManager } from './session.js';
 
 interface ExecOptions {
@@ -55,6 +56,10 @@ export function createExecDispatcher(
 
     if (type === 'bash') {
       return runInBash(code, { timeout, env });
+    }
+
+    if (type === 'python') {
+      return runInPython(code, { timeout, env });
     }
 
     throw new Error(`Unsupported runtime: ${type}`);
