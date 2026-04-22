@@ -24,7 +24,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sandbox-runtime": "^0.0.49",
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "optionalDependencies": {
     "cheerio": "^1.2.0",
     "csv-parse": "^6.2.1",
     "date-fns": "^4.1.0",
