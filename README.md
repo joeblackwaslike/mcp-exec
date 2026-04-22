@@ -280,6 +280,22 @@ npx mcp-exec-install-skill          # appends to ~/.claude/CLAUDE.md (global)
 npx mcp-exec-install-skill --local  # appends to ./CLAUDE.md (project)
 ```
 
+## Skills
+
+mcp-exec ships two Claude Code skills that activate automatically when the plugin is installed.
+
+| Skill | Activates when... | Supporting references |
+|---|---|---|
+| **Using mcp-exec** | You're writing `exec()` or `tools()` calls in a conversation | `ts-sdk-reference.md`, `py-sdk-reference.md` |
+| **mcp-exec Dev Workflow** | You're building a project and about to fetch API docs, run multi-step research, or process large API responses | — |
+
+To load the skills manually (if you installed mcp-exec without the plugin system):
+
+```sh
+npx mcp-exec-install-skill          # appends to ~/.claude/CLAUDE.md (global)
+npx mcp-exec-install-skill --local  # appends to .claude/CLAUDE.md (project)
+```
+
 ## Sandbox configuration
 
 mcp-exec reads the `sandbox` block from your existing Claude Code settings — no separate config file:
@@ -412,10 +428,25 @@ Use `tool_calls` in the exec result for observability. Lifecycle hooks (`Session
 
 | Version | Status | Focus |
 |---------|--------|-------|
-| v0.1 | ✅ | Node + Bash runtimes, Gmail/GDrive shims, `tools` + `exec`, implicit sessions |
-| v0.2 | planned | Generic MCP shim generator (any server), lazy tool catalog, TypeScript SDK reference |
-| v0.3 | planned | Python runtime via `uv run --isolated`, Python SDK reference |
+| v0.1 | ✅ | Node + Bash runtimes, MCP shim loader hooks, `tools` + `exec`, implicit sessions |
+| v0.2 | ✅ | Generic MCP shim generator (any server), lazy tool catalog, TypeScript SDK reference |
+| v0.3 | ✅ | Python runtime via `uv run --isolated`, Python SDK reference, plugin polish |
 | v1.0 | planned | Token benchmark CI suite, state persistence, per-workflow telemetry |
+
+## For app developers
+
+If you're building a TypeScript application with a conversational agent, mcp-exec is relevant in two ways:
+
+**1. As a dev tool** — install the plugin and use `exec()` during development to keep large API responses, research results, and intermediate data out of your context window. See the [mcp-exec Dev Workflow skill](skills/dev-workflow/SKILL.md).
+
+**2. As a design pattern** — apply the same server-side aggregation philosophy to your own agent tool layer. Instead of returning raw query results to the agent, each tool aggregates server-side and returns a single clean structured object. The agent receives a decision-ready summary in ~200 tokens instead of 15 raw rows.
+
+```
+❌ Thin: agent → search_comps() → 15 raw rows → agent reasons over them
+✅ Thick: agent → research_pricing(id) → { price, confidence, evidence }
+```
+
+See [DEVELOPER.md](docs/DEVELOPER.md) for the full pattern, hook compatibility details, and `tool_calls` observability inside the sandbox.
 
 ## Development
 

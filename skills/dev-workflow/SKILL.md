@@ -115,7 +115,7 @@ exec({ runtime: "node", code: `
   const resp = await fetch('https://api.example.com/records?limit=5000');
   const rows = await resp.json();
   writeFileSync('/tmp/mcp-exec-rows.json', JSON.stringify(rows));
-  return rows.length + ' rows written to /tmp/mcp-exec-rows.json';
+  return rows.length + ' rows written to /tmp/mcp-exec-rows.json'; // Node: return value is the exec() output
 `})
 
 // Step 2 (python): analyze with pandas, return summary
@@ -130,7 +130,7 @@ with open('/tmp/mcp-exec-rows.json') as f:
 
 df = pd.DataFrame(data)
 summary = df.groupby('category')['price'].agg(['mean', 'count']).round(2)
-print(summary.to_json())
+print(summary.to_json())  # Python: stdout is the exec() output
 `})
 ```
 
