@@ -250,13 +250,17 @@ exec({
 
 ## Installation
 
-### As a Claude Code plugin
+### Via the agent-marketplace (recommended)
 
 ```sh
-npx claude install-plugin mcp-exec
+# Add the marketplace (one-time setup)
+claude plugin marketplace add joeblackwaslike/agent-marketplace
+
+# Install mcp-exec
+claude plugin install mcp-exec
 ```
 
-This registers the MCP server and installs the skill so Claude knows how to use it.
+This registers the MCP server and installs the skills so Claude knows how to use them.
 
 ### Manual setup
 
