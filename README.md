@@ -227,3 +227,176 @@ print(summary.head(5).to_json())
 ```
 
 ---
+
+## Reproducible case study
+
+The numbers above are real. You can verify them yourself in 5 minutes.
+
+**[→ Download case-study.md](case-study.md)** — full reproduction instructions, token logging commands, expected output.
+
+Our run: **43,800 tokens → 90 tokens (99.8% reduction)** on a PR staleness nudge workflow (GitHub + Slack, 87 open PRs).
+
+---
+
+## Installation
+
+### Via the agent-marketplace (recommended)
+
+```sh
+# Add the marketplace (one-time setup)
+claude plugin marketplace add joeblackwaslike/agent-marketplace
+
+# Install mcp-exec
+claude plugin install mcp-exec
+```
+
+This registers the MCP server and installs the skills so Claude knows when and how to use them.
+
+### Manual setup
+
+Add to `.claude/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["mcp-exec"]
+    }
+  }
+}
+```
+
+Then install the skill:
+
+```sh
+npx mcp-exec-install-skill          # appends to ~/.claude/CLAUDE.md (global)
+npx mcp-exec-install-skill --local  # appends to .claude/CLAUDE.md (project)
+```
+
+---
+
+## Skills
+
+mcp-exec ships two Claude Code skills that activate automatically on install.
+
+| Skill | Activates when… | References |
+|-------|----------------|------------|
+| **Using mcp-exec** | Writing `exec()` or `tools()` calls | `ts-sdk-reference.md`, `py-sdk-reference.md` |
+| **mcp-exec Dev Workflow** | Building a project, fetching API docs, or processing large API responses | — |
+
+---
+
+## Requirements
+
+- **Node.js** 20.12+
+- **uv** (Python runtime) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- **macOS** or **Linux** (sandbox uses `sandbox-exec`/bubblewrap; Windows not supported)
+- **Claude Code** 2.1.7+ recommended (enables CC Tool Search for maximum savings)
+
+---
+
+## Reference
+
+### `tools(query)`
+
+```typescript
+tools("*")                    // all tools across all connected servers
+tools("search emails")        // substring match across name + description
+tools('"pull request"')       // exact phrase match
+```
+
+Returns `{ server, name, description, signature }[]` — trimmed summaries, no full schemas.
+
+### `exec(params)`
+
+```typescript
+exec({
+  code: string,
+  runtime:
+    | "node"
+    | "bash"
+    | "python"
+    | { type: "node" | "bash" | "python", timeout?: number, env?: Record<string, string> },
+  session_id?: string,   // optional — for parallel isolation
+})
+// → { result: unknown, tool_calls: ToolCallRecord[] }
+```
+
+**Node:** persistent session via `globalThis`. Bundled packages: `zod`, `lodash-es`, `date-fns`, `csv-parse`, `cheerio`, `xlsx`. MCP imports via `import { tool } from 'mcp/server-name'`.
+
+**Bash:** stateless subprocess. stdout becomes `result`.
+
+**Python:** stateless via `uv run --isolated`. Declare dependencies inline with [PEP 723](https://peps.python.org/pep-0723/). stdout becomes `result`. MCP tools not available from Python (pass data via temp files or env vars).
+
+### Session state
+
+Implicit session per conversation (Node only). Explicit `session_id` for parallel isolation. Sessions expire after 10 minutes idle. Maximum 100 concurrent sessions.
+
+### Error handling
+
+```typescript
+const { result } = await exec({ runtime: "node", code: `...` });
+if (typeof result === 'object' && result !== null && 'error' in result) {
+  const { error, line, column } = result;
+}
+```
+
+---
+
+## When NOT to use mcp-exec
+
+- Single-tool calls where the result is small and you want it visible in context
+- When you need to display raw API output verbatim to the user
+- Interactive tool calls where the user needs to confirm intermediate results
+
+---
+
+## Security
+
+The sandbox enforces restrictions at the OS level via `@anthropic-ai/sandbox-runtime`. All child processes inherit them — no language-level bypass exists.
+
+**v0.1 known limitations** (tracked in [#3](https://github.com/joeblackwaslike/mcp-exec/issues/3)):
+
+- Bash runtime inherits the full process environment. Env var filtering is planned.
+- Auth for downstream MCP servers works via env vars present in your shell — all credentials are in scope for the session lifetime.
+
+## Plugin compatibility
+
+`PreToolUse`/`PostToolUse` hooks watching downstream tool names will **not** fire when those tools are called inside `exec` — the sandbox is opaque to the CC event system. Use `tool_calls` in the exec result for observability.
+
+## Roadmap
+
+| Version | Status | Focus |
+|---------|--------|-------|
+| v0.1 | ✅ | Node + Bash runtimes, MCP shim loader hooks, `tools` + `exec`, implicit sessions |
+| v0.2 | ✅ | Generic MCP shim generator, lazy tool catalog, TypeScript SDK reference |
+| v0.3 | ✅ | Python runtime via `uv run --isolated`, Python SDK reference, plugin polish |
+| v1.0 | planned | Token benchmark CI suite, state persistence, per-workflow telemetry |
+
+## For app developers
+
+Apply the same server-side aggregation philosophy to your own agent tool layer. Instead of returning raw query results to the agent, each tool aggregates server-side and returns a single clean structured object.
+
+```
+❌ Thin: agent → search_comps() → 15 raw rows → agent reasons over them
+✅ Thick: agent → research_pricing(id) → { price, confidence, evidence }
+```
+
+See [DEVELOPER.md](docs/DEVELOPER.md) for the full pattern and `tool_calls` observability details.
+
+## Development
+
+```sh
+npm install
+npm run dev         # start server with tsx
+npm test            # vitest
+npm run typecheck   # tsc --noEmit
+npm run lint        # biome check
+```
+
+Issue tracking: `bd ready` (requires beads).
+
+## License
+
+MIT
