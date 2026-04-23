@@ -80,7 +80,14 @@ Two tools:
 - `tools(query)` — searches connected MCP servers, returns trimmed summaries, full schemas never touch context
 - `exec(code, runtime)` — runs code in sandbox, MCP servers importable as modules, only final return value surfaces
 
+**Runtimes (v0.3):**
+- `"node"` — persistent session state via `globalThis`, bundled packages (zod, lodash-es, date-fns, csv-parse, cheerio, xlsx), MCP imports via loader hooks
+- `"bash"` — stateless subprocess, full Unix toolbox
+- `"python"` — stateless via `uv run --isolated`, Python 3.12, PEP 723 inline dependencies, stdout as result channel, arbitrary PyPI packages declared inline
+
 Architecture SVG diagram: Claude Code → tools()/exec() → sandbox boundary (dashed orange) → MCP servers → result (green arrow back, labeled "~50 tokens").
+
+Runtime selector shown below diagram: three pills (Node · Bash · Python) indicating the runtime param.
 
 ### 9. Token savings chart (SVG)
 Horizontal bar chart, 4 workflows, proportional bars (red = without, green = with):
@@ -114,7 +121,14 @@ Dark card with orange accent. Includes:
 - **Why:** schema bloat + result bloat both eliminated, explained in 3 bullet points
 - **Download link:** `case-study.md` in repo root — full reproduction instructions, token logging commands, expected output
 
-### 12. Installation (Quick start)
+### 12. Skills (v0.3)
+Two skills ship with the plugin, installed automatically:
+- **`using-mcp-exec`** — activates when writing `exec()` or `tools()` calls. Includes `ts-sdk-reference.md` and `py-sdk-reference.md` as supporting references.
+- **`dev-workflow`** — activates when building a project and about to fetch API docs, run multi-step research, or process large API responses.
+
+Skills can be manually appended to CLAUDE.md via: `npx mcp-exec-install-skill` (global) or `npx mcp-exec-install-skill --local` (project).
+
+### 13. Installation (Quick start)
 Three steps:
 ```sh
 # 1. Add the marketplace (one-time)
@@ -127,25 +141,28 @@ claude plugin install mcp-exec
 ```
 Manual setup (mcp.json) as collapsed `<details>` below.
 
-### 13. Requirements
-Node.js 20.12+, macOS or Linux, Claude Code 2.1.7+ recommended.
+### 14. Requirements
+- Node.js 20.12+ (required)
+- `uv` (required for Python runtime — auto-detected, install via `curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- macOS or Linux
+- Claude Code 2.1.7+ recommended
 
-### 14. Reference (condensed)
-`tools(query)` and `exec(params)` API reference. Session state. Cross-runtime data threading. Error handling. All condensed — full detail already in skills/.
+### 15. Reference (condensed)
+`tools(query)` and `exec(params)` API reference including all three runtimes (node/bash/python). Session state (Node only — Bash and Python are stateless). Cross-runtime data threading. Error handling. Python PEP 723 inline dependency declaration. Bundled Node packages (zod, lodash-es, date-fns, csv-parse, cheerio, xlsx). Full detail in skills/.
 
-### 15. When NOT to use mcp-exec
+### 16. When NOT to use mcp-exec
 Keep from current README. Short, honest.
 
-### 16. Security
+### 17. Security
 Keep from current README. Reference known v0.1 limitations.
 
-### 17. Roadmap table
+### 18. Roadmap table
+Keep from current README (v0.1 ✅, v0.2 ✅, v0.3 ✅, v1.0 planned).
+
+### 19. Plugin compatibility note
 Keep from current README.
 
-### 18. Plugin compatibility note
-Keep from current README.
-
-### 19. License
+### 20. License
 MIT.
 
 ---
