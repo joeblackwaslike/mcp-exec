@@ -1,0 +1,103 @@
+<svg viewBox="0 0 860 380" width="860" height="380" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="og" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#dc2626"/>
+    </linearGradient>
+  </defs>
+  <style>
+    text { font-family: ui-monospace,'SF Mono',Menlo,monospace; }
+    .label { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:11px; fill:#8b949e; }
+    .title { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:13px; font-weight:700; }
+    .sub   { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; font-size:11px; fill:#484f58; }
+    .tok   { font-size:10px; fill:#3a4455; }
+  </style>
+
+  <!-- Background -->
+  <rect width="860" height="380" fill="#0d1117"/>
+
+  <!-- LEFT: Without -->
+  <rect x="20" y="20" width="390" height="340" rx="12" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+  <!-- Header -->
+  <circle cx="44" cy="44" r="5" fill="#ef4444"/>
+  <text x="56" y="49" class="title" fill="#ef4444">Without mcp-exec</text>
+
+  <!-- Steps without -->
+  <rect x="36" y="68" width="358" height="42" rx="6" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="52" y="86" font-size="11" fill="#c9d1d9">Claude calls gmail.search()</text>
+  <text x="52" y="100" class="tok">→ 200 emails land in context window</text>
+  <text x="360" y="86" text-anchor="end" font-size="10" fill="#ef4444">+8,000 tok</text>
+
+  <line x1="64" y1="110" x2="64" y2="122" stroke="#21262d" stroke-width="1"/>
+
+  <rect x="36" y="122" width="358" height="42" rx="6" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="52" y="140" font-size="11" fill="#c9d1d9">Claude fetches 3 email details</text>
+  <text x="52" y="154" class="tok">→ full bodies in context</text>
+  <text x="360" y="140" text-anchor="end" font-size="10" fill="#ef4444">+3,000 tok</text>
+
+  <line x1="64" y1="164" x2="64" y2="176" stroke="#21262d" stroke-width="1"/>
+
+  <rect x="36" y="176" width="358" height="42" rx="6" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="52" y="194" font-size="11" fill="#c9d1d9">Claude calls slack.postMessage()</text>
+  <text x="52" y="208" class="tok">→ response in context</text>
+  <text x="360" y="194" text-anchor="end" font-size="10" fill="#ef4444">+1,000 tok</text>
+
+  <!-- Context window table -->
+  <rect x="36" y="234" width="358" height="108" rx="6" fill="#0a0a0f" stroke="#21262d" stroke-width="1"/>
+  <rect x="36" y="234" width="358" height="20" rx="6" fill="#161b22"/>
+  <rect x="36" y="248" width="358" height="6" fill="#161b22"/>
+  <text x="52" y="248" class="label">CONTEXT WINDOW</text>
+  <text x="52" y="268" font-size="10" fill="#ef4444">6 server schemas (startup)</text>
+  <text x="382" y="268" text-anchor="end" font-size="10" fill="#3a4455">40,000</text>
+  <text x="52" y="284" font-size="10" fill="#ef4444">gmail.search result</text>
+  <text x="382" y="284" text-anchor="end" font-size="10" fill="#3a4455">8,000</text>
+  <text x="52" y="300" font-size="10" fill="#ef4444">3× getEmail results</text>
+  <text x="382" y="300" text-anchor="end" font-size="10" fill="#3a4455">3,000</text>
+  <text x="52" y="316" font-size="10" fill="#ef4444">slack response</text>
+  <text x="382" y="316" text-anchor="end" font-size="10" fill="#3a4455">1,000</text>
+  <line x1="36" y1="324" x2="394" y2="324" stroke="#21262d" stroke-width="1"/>
+  <text x="52" y="338" font-size="11" font-weight="700" fill="#ef4444">Total</text>
+  <text x="382" y="338" text-anchor="end" font-size="11" font-weight="700" fill="#ef4444">52,000 tokens</text>
+
+  <!-- RIGHT: With mcp-exec -->
+  <rect x="450" y="20" width="390" height="340" rx="12" fill="#161b22" stroke="#21262d" stroke-width="1"/>
+  <rect x="466" y="34" width="26" height="26" rx="5" fill="url(#og)"/>
+  <text x="470" y="51" font-size="16" fill="#fff7ed">›</text>
+  <text x="500" y="49" class="title" fill="#3fb950">With mcp-exec</text>
+
+  <!-- Single exec step -->
+  <rect x="466" y="68" width="358" height="58" rx="6" fill="#0d1117" stroke="#fb923c" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="482" y="86" font-size="10" fill="#484f58">SANDBOX</text>
+  <text x="482" y="102" font-size="11" fill="#c9d1d9">exec({ runtime: "node", code: `…` })</text>
+  <text x="482" y="118" class="tok">fetch 200 emails → filter → post — all stays here</text>
+
+  <!-- Arrow down showing result only -->
+  <line x1="538" y1="126" x2="538" y2="154" stroke="#3fb950" stroke-width="2" marker-end="url(#garrow)"/>
+  <defs>
+    <marker id="garrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#3fb950"/>
+    </marker>
+  </defs>
+  <text x="548" y="144" font-size="10" fill="#3fb950">result only</text>
+
+  <rect x="466" y="154" width="358" height="30" rx="6" fill="#0d1117" stroke="#21262d" stroke-width="1"/>
+  <text x="482" y="174" font-size="11" fill="#3fb950">"Posted 3 urgent emails to #oncall"</text>
+
+  <!-- Context window table — clean -->
+  <rect x="466" y="200" width="358" height="108" rx="6" fill="#0a0a0f" stroke="#21262d" stroke-width="1"/>
+  <rect x="466" y="200" width="358" height="20" rx="6" fill="#161b22"/>
+  <rect x="466" y="214" width="358" height="6" fill="#161b22"/>
+  <text x="482" y="214" class="label">CONTEXT WINDOW</text>
+  <text x="482" y="244" font-size="11" fill="#3fb950">exec() result</text>
+  <text x="812" y="244" text-anchor="end" font-size="11" fill="#3a4455">50</text>
+  <line x1="466" y1="258" x2="824" y2="258" stroke="#21262d" stroke-width="1"/>
+  <text x="482" y="276" font-size="11" font-weight="700" fill="#3fb950">Total</text>
+  <text x="812" y="276" text-anchor="end" font-size="11" font-weight="700" fill="#3fb950">50 tokens</text>
+
+  <!-- Savings pill -->
+  <rect x="560" y="296" width="180" height="28" rx="14" fill="rgba(63,185,80,0.15)" stroke="rgba(63,185,80,0.4)" stroke-width="1"/>
+  <text x="650" y="315" text-anchor="middle" font-size="13" font-weight="700" fill="#3fb950">99.9% reduction</text>
+
+  <!-- Divider -->
+  <line x1="430" y1="20" x2="430" y2="360" stroke="#21262d" stroke-width="1"/>
+</svg>
