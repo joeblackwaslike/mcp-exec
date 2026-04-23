@@ -72,3 +72,158 @@ mcp-exec adds two tools to Claude Code:
 <img src="assets/infographic-savings.svg" alt="Token savings by workflow type" width="100%">
 
 ---
+
+## Scenarios
+
+### Overdue invoice triage — 27,000 → 80 tokens
+
+**Without mcp-exec:** 847 invoices returned raw (14k tokens), customer lookups add 8k more, rate limit mid-task.
+
+**With mcp-exec:**
+
+```typescript
+exec({
+  runtime: "node",
+  code: `
+    import { searchInvoices, getInvoice } from 'mcp/quickbooks';
+    import { getCustomer } from 'mcp/crm';
+    import { createDraft } from 'mcp/gmail';
+
+    const overdue = await searchInvoices({ status: 'overdue' });
+    const details = await Promise.all(
+      overdue.map(inv => Promise.all([
+        getInvoice({ id: inv.id }),
+        getCustomer({ id: inv.customerId })
+      ]))
+    );
+    const body = details
+      .map(([inv, cust]) => \`\${inv.amount} — \${cust.name}\`)
+      .join('\n');
+    await createDraft({ to: 'sales@co.com', subject: 'Overdue invoices', body });
+    return \`Draft created — \${overdue.length} invoices\`;
+  `
+})
+// → "Draft created — 23 invoices"   tokens used: ~80
+```
+
+---
+
+### Morning standup brief — 20,000 → 60 tokens
+
+**Without mcp-exec:** 34 Linear tickets + 12 PRs with diffs + 200 Slack messages = 20k tokens before the meeting starts.
+
+**With mcp-exec:**
+
+```typescript
+exec({
+  runtime: "node",
+  code: `
+    import { getIssues } from 'mcp/linear';
+    import { listPullRequests } from 'mcp/github';
+    import { getMessages, postMessage } from 'mcp/slack';
+
+    const [tickets, prs, msgs] = await Promise.all([
+      getIssues({ assignee: 'me', status: 'in_progress' }),
+      listPullRequests({ state: 'open', author: 'me' }),
+      getMessages({ channel: '#team', since: 'yesterday' }),
+    ]);
+
+    await postMessage({
+      channel: '#standup',
+      text: [
+        '🔴 Blocked: ' + tickets.filter(t => t.labels.includes('blocked')).length,
+        '👀 PRs needing review: ' + prs.filter(pr => pr.reviewers.length === 0).length,
+        '📣 Mentions: ' + msgs.filter(m => m.text.includes('@me')).length,
+      ].join('\n'),
+    });
+    return 'Standup posted';
+  `
+})
+// → "Standup posted"   tokens used: ~60
+```
+
+---
+
+### Research loop — 40,000 → 55 tokens
+
+**Without mcp-exec:** Three fetched pages = 40k tokens. Can't read more than 4 sources per session.
+
+**With mcp-exec:**
+
+```typescript
+exec({
+  runtime: "node",
+  code: `
+    import { search, fetch } from 'mcp/browser';
+    import { createDoc } from 'mcp/gdrive';
+
+    const results = await search({ query: 'best React patterns 2025' });
+
+    // Fetch all 10 results in parallel — full HTML stays in sandbox
+    const pages = await Promise.all(results.map(r => fetch({ url: r.url })));
+
+    // Extract only what matters
+    const insights = pages.flatMap(page =>
+      page.headings.filter(h => h.level <= 2).map(h => h.text)
+    );
+
+    const doc = await createDoc({
+      title: 'React Patterns 2025',
+      content: insights.join('\n'),
+    });
+    return doc.url;
+  `
+})
+// → "https://docs.google.com/document/d/..."   tokens used: ~55
+```
+
+---
+
+### Stateful multi-step — data loaded once, queried many times
+
+Session state persists across `exec()` calls in Node. Fetch once, slice differently without re-fetching.
+
+```typescript
+// Step 1 — load 100 PRs into session
+exec({ runtime: "node", code: `
+  import { listPullRequests } from 'mcp/github';
+  globalThis.prs = await listPullRequests({ state: 'open', per_page: 100 });
+  return globalThis.prs.length + ' PRs loaded';
+`});
+// → "100 PRs loaded"
+
+// Step 2 — find stale (no re-fetch)
+exec({ runtime: "node", code: `
+  const stale = globalThis.prs.filter(pr => {
+    const days = (Date.now() - new Date(pr.updated_at)) / 86400000;
+    return days > 14;
+  });
+  return stale.map(pr => ({ number: pr.number, days: Math.floor((Date.now() - new Date(pr.updated_at)) / 86400000) }));
+`});
+// → [{number: 42, days: 21}, ...]
+```
+
+---
+
+### Python — data analysis with pandas
+
+```python
+exec({
+  "runtime": "python",
+  "code": """
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["pandas>=2.0"]
+# ///
+import json, sys, pandas as pd
+
+data = json.loads(sys.argv[1]) if len(sys.argv) > 1 else []
+df = pd.DataFrame(data)
+summary = df.groupby('stage')['amount'].sum().sort_values(ascending=False)
+print(summary.head(5).to_json())
+"""
+})
+# → {"Closed Won": 12400000, "Negotiation": 4200000, ...}
+```
+
+---
