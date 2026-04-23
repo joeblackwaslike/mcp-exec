@@ -252,7 +252,8 @@ claude plugin install mcp-exec
 
 This registers the MCP server and installs the skills so Claude knows when and how to use them.
 
-### Manual setup
+<details>
+<summary>Manual setup</summary>
 
 Add to `.claude/mcp.json`:
 
@@ -273,6 +274,8 @@ Then install the skill:
 npx mcp-exec-install-skill          # appends to ~/.claude/CLAUDE.md (global)
 npx mcp-exec-install-skill --local  # appends to .claude/CLAUDE.md (project)
 ```
+
+</details>
 
 ---
 

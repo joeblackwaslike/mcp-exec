@@ -27,7 +27,7 @@
   <rect x="20" y="40" width="490" height="10" rx="3" fill="#21262d"/>
   <rect x="20" y="40" width="86" height="10" rx="3" fill="url(#bad)"/>
   <rect x="20" y="52" width="490" height="10" rx="3" fill="#21262d"/>
-  <rect x="20" y="52" width="1" height="10" rx="3" fill="url(#good)"/>
+  <rect x="20" y="52" width="4" height="10" rx="3" fill="url(#good)"/>
 
   <!-- Row 2: Cross-service 30,000 → 50 -->
   <text x="20" y="88" class="sans label">Cross-service report (GitHub + Slack + Drive)</text>
@@ -39,7 +39,7 @@
   <rect x="20" y="94" width="490" height="10" rx="3" fill="#21262d"/>
   <rect x="20" y="94" width="184" height="10" rx="3" fill="url(#bad)"/>
   <rect x="20" y="106" width="490" height="10" rx="3" fill="#21262d"/>
-  <rect x="20" y="106" width="1" height="10" rx="3" fill="url(#good)"/>
+  <rect x="20" y="106" width="4" height="10" rx="3" fill="url(#good)"/>
 
   <!-- Row 3: Large dataset 80,000 → 50 -->
   <text x="20" y="142" class="sans label">Large dataset (Salesforce 5k rows)</text>
@@ -51,7 +51,7 @@
   <rect x="20" y="148" width="490" height="10" rx="3" fill="#21262d"/>
   <rect x="20" y="148" width="490" height="10" rx="3" fill="url(#bad)"/>
   <rect x="20" y="160" width="490" height="10" rx="3" fill="#21262d"/>
-  <rect x="20" y="160" width="1" height="10" rx="3" fill="url(#good)"/>
+  <rect x="20" y="160" width="4" height="10" rx="3" fill="url(#good)"/>
 
   <!-- Row 4: Schema overhead 40,000 → 0 -->
   <text x="20" y="196" class="sans label">Schema overhead alone (6 servers, startup)</text>
