@@ -36,7 +36,7 @@ sandbox is opaque to CC's hook dispatch.
 ### Plugin compatibility checker (v0.2, planned)
 
 ```sh
-npx mcp-exec check-plugins
+npx --package=@joeblackwaslike2/mcp-exec mcp-exec-check-plugins
 ```
 
 Scans `~/.claude/settings.json` and `.claude/settings.json` for hooks that watch
