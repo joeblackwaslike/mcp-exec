@@ -4,13 +4,20 @@
   "type": "module",
   "description": "MCP server for sandboxed code execution with context window reduction",
   "bin": {
-    "mcp-exec": "./dist/src/server.js",
-    "mcp-exec-install-skill": "./dist/bin/install-skill.js",
-    "mcp-exec-check-plugins": "./dist/src/cli/check-plugins.js"
+    "mcp-exec": "dist/src/server.js",
+    "mcp-exec-install-skill": "dist/bin/install-skill.js",
+    "mcp-exec-check-plugins": "dist/src/cli/check-plugins.js"
   },
+  "files": [
+    "dist/",
+    "skills/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "tsx src/server.ts",
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "biome check .",
