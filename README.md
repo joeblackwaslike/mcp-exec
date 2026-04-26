@@ -262,7 +262,7 @@ Add to `.claude/mcp.json`:
   "mcpServers": {
     "mcp-exec": {
       "command": "npx",
-      "args": ["mcp-exec"]
+      "args": ["@joeblackwaslike/mcp-exec"]
     }
   }
 }
@@ -271,8 +271,8 @@ Add to `.claude/mcp.json`:
 Then install the skill:
 
 ```sh
-npx mcp-exec-install-skill          # appends to ~/.claude/CLAUDE.md (global)
-npx mcp-exec-install-skill --local  # appends to .claude/CLAUDE.md (project)
+npx --package=@joeblackwaslike/mcp-exec mcp-exec-install-skill          # appends to ~/.claude/CLAUDE.md (global)
+npx --package=@joeblackwaslike/mcp-exec mcp-exec-install-skill --local  # appends to .claude/CLAUDE.md (project)
 ```
 
 </details>

@@ -9,7 +9,7 @@
     "servers": {
       "mcp-exec": {
         "command": "npx",
-        "args": ["mcp-exec"],
+        "args": ["@joeblackwaslike/mcp-exec"],
         "description": "Sandboxed code execution with MCP tool access"
       }
     }
@@ -18,7 +18,7 @@
     {
       "name": "install-skill",
       "description": "Append mcp-exec skill loader to CLAUDE.md",
-      "run": "npx mcp-exec-install-skill"
+      "run": "npx --package=@joeblackwaslike/mcp-exec mcp-exec-install-skill"
     }
   ]
 }
