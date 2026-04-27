@@ -16,7 +16,7 @@
   },
   "commands": [
     {
-      "name": "install-skill",
+      "name": "mcp-exec-install-skill",
       "description": "Append mcp-exec skill loader to CLAUDE.md",
       "run": "npx --package=@joeblackwaslike2/mcp-exec mcp-exec-install-skill"
     }

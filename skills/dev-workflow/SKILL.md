@@ -137,7 +137,7 @@ print(summary.to_json())  # Python: stdout is the exec() output
 ## Project setup
 
 1. **Install the plugin** via Claude Code's plugin system — auto-wires the MCP server into your conversation
-2. **Run `/install-skill`** to append the mcp-exec skill to your project's `CLAUDE.md`
+2. **Run `/mcp-exec-install-skill`** to append the mcp-exec skill to your project's `CLAUDE.md`
 3. **Add a `sandbox` block** to `.claude/settings.json` listing the domains your MCP servers and `fetch` calls need:
 
 ```json
