@@ -16,9 +16,9 @@
   },
   "commands": [
     {
-      "name": "mcp-exec-install-skill",
-      "description": "Append mcp-exec skill loader to CLAUDE.md",
-      "run": "npx --package=@joeblackwaslike2/mcp-exec mcp-exec-install-skill"
+      "name": "mcp-exec-prime-skill",
+      "description": "Add mcp-exec activation rule to CLAUDE.md (primes the model to use it)",
+      "run": "npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill"
     }
   ]
 }
