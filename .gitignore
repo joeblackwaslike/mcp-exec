@@ -9,3 +9,4 @@ coverage/
 *.db
 .beads-credential-key
 .superpowers/
+.worktrees/
