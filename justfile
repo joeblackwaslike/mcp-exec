@@ -23,3 +23,8 @@ build:
 # Run a single test file
 test-file FILE:
     npx vitest run {{FILE}}
+
+# Build then run smoke tests against the built binary (run before every release)
+smoke:
+    npm run build
+    node scripts/smoke-test.mjs
