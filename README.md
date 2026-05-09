@@ -240,7 +240,13 @@ Our run: **43,800 tokens → 90 tokens (99.8% reduction)** on a PR staleness nud
 
 ## Installation
 
-### Via the agent-marketplace (recommended)
+Supported agents: [Claude Code](#claude-code) · [Cursor](#cursor) · [Windsurf](#windsurf) · [GitHub Copilot](#github-copilot) · [Gemini CLI](#gemini-cli) · [Codex CLI](#codex-cli) · [Cline](#cline)
+
+---
+
+### Claude Code
+
+**Via the agent-marketplace (recommended):**
 
 ```sh
 # Add the marketplace (one-time setup)
@@ -257,9 +263,8 @@ npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill          # global 
 npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill --local  # project-level (./CLAUDE.md)
 ```
 
-> **Why?** Skills activate ~40% of the time from the skills directory alone. Priming adds a one-line
-> trigger rule to CLAUDE.md that brings reliability to ~90–95%. Run it once and you're set — it's
-> idempotent.
+> **Why?** Skills activate ~40% of the time from the skills directory alone. Priming adds a trigger
+> rule to CLAUDE.md that brings reliability to ~90–95%. It's idempotent — safe to run more than once.
 
 <details>
 <summary>Manual setup</summary>
@@ -277,27 +282,185 @@ npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill --local  # project
 }
 ```
 
-**2. Prime your CLAUDE.md / AGENTS.md** — appends the activation rule so the model picks up the skill reliably:
+**2. Prime your CLAUDE.md:**
 
 ```sh
 npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill          # global (~/.claude/CLAUDE.md)
 npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill --local  # project-level (./CLAUDE.md)
 ```
 
-For Gemini CLI or other agents, copy the rule manually into your `AGENTS.md`:
+</details>
 
-```markdown
-## Skill Activations
+---
 
-### `mcp-exec` — sandboxed execution + MCP tool search
+### Cursor
 
-Activate the `using-mcp-exec` skill when you are about to:
-- Call 2+ MCP tools in sequence where intermediate results don't need to stay in context
-- Do multi-step research, data aggregation, or schema processing
-- Fan out across multiple sources and return a single summary
+**1.** Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global):
+
+```json
+{
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"]
+    }
+  }
+}
 ```
 
-</details>
+**2.** Add to `.cursorrules` (or Cursor's custom system prompt):
+
+```
+## mcp-exec
+
+When completing tasks that require multiple MCP tool calls or large intermediate data:
+- Use tools(query) to discover available tools without loading full schemas into context
+- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
+- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+```
+
+---
+
+### Windsurf
+
+**1.** Add to `~/.codeium/windsurf/mcp_config.json` (create the file if it doesn't exist):
+
+```json
+{
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"]
+    }
+  }
+}
+```
+
+**2.** Add to Windsurf's custom instructions (Settings → Cascade → Custom Instructions):
+
+```
+## mcp-exec
+
+When completing tasks that require multiple MCP tool calls or large intermediate data:
+- Use tools(query) to discover available tools without loading full schemas into context
+- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
+- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+```
+
+Restart Windsurf after editing the config file.
+
+---
+
+### GitHub Copilot
+
+> Requires VS Code 1.101+ and Copilot agent mode.
+
+**1.** Add to `.vscode/mcp.json` in your project:
+
+```json
+{
+  "servers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"]
+    }
+  }
+}
+```
+
+> ⚠️ **Note:** VS Code uses `"servers"`, not `"mcpServers"`. Copy-pasting from a Cursor or Claude Code config without changing this key will silently fail to load.
+
+**2.** Add to `.github/copilot-instructions.md`:
+
+```markdown
+## mcp-exec
+
+When completing tasks that require multiple MCP tool calls or large intermediate data:
+- Use tools(query) to discover available tools without loading full schemas into context
+- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
+- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+```
+
+---
+
+### Gemini CLI
+
+**1.** Add to `~/.gemini/settings.json` (global) or `.gemini/settings.json` (project):
+
+```json
+{
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"]
+    }
+  }
+}
+```
+
+> ⚠️ **Note:** Do not use underscores in the server name — use `mcp-exec`, not `mcp_exec`. The Gemini CLI policy parser splits on underscores and will misroute the server identity.
+
+**2.** Add to `GEMINI.md` or `AGENT.md` in your project root:
+
+```markdown
+## mcp-exec
+
+When completing tasks that require multiple MCP tool calls or large intermediate data:
+- Use tools(query) to discover available tools without loading full schemas into context
+- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
+- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+```
+
+---
+
+### Codex CLI
+
+**1.** Add to `~/.codex/config.toml` (global) or `.codex/config.toml` (project):
+
+```toml
+[mcp_servers.mcp-exec]
+command = "npx"
+args = ["@joeblackwaslike2/mcp-exec"]
+```
+
+**2.** Add to `AGENTS.md` in your project root:
+
+```markdown
+## mcp-exec
+
+When completing tasks that require multiple MCP tool calls or large intermediate data:
+- Use tools(query) to discover available tools without loading full schemas into context
+- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
+- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+```
+
+---
+
+### Cline
+
+**1.** In VS Code, open Cline's settings panel → MCP Servers tab → add a new server:
+
+```json
+{
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"]
+    }
+  }
+}
+```
+
+**2.** In Cline's custom instructions (Settings → Custom Instructions), add:
+
+```
+## mcp-exec
+
+When completing tasks that require multiple MCP tool calls or large intermediate data:
+- Use tools(query) to discover available tools without loading full schemas into context
+- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
+- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+```
 
 ---
 
