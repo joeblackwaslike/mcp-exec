@@ -1,3 +1,5 @@
+import type { BridgeServer } from '../bridge/server.js';
+import type { ToolRef } from '../catalog/builder.js';
 import type { ExecResult, RuntimeParam } from '../types.js';
 import { runInBash } from './runtimes/bash.js';
 import { runInNode } from './runtimes/node.js';
@@ -40,6 +42,8 @@ function wrapClients(clients: Record<string, SdkClient>): ShimClientMap {
 export function createExecDispatcher(
   sessions: SessionManager,
   mcpClients: Record<string, SdkClient>,
+  bridge?: BridgeServer,
+  toolsByServer?: Record<string, ToolRef[]>,
 ) {
   const shimClients = wrapClients(mcpClients);
 
@@ -59,7 +63,7 @@ export function createExecDispatcher(
     }
 
     if (type === 'python') {
-      return runInPython(code, { timeout, env });
+      return runInPython(code, { timeout, env, bridge, toolsByServer });
     }
 
     throw new Error(`Unsupported runtime: ${type}`);

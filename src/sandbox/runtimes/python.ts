@@ -3,20 +3,46 @@ import { randomUUID } from 'node:crypto';
 import { unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { generateMcpPackage, removeMcpPackage } from '../../bridge/package-generator.js';
+import type { BridgeServer } from '../../bridge/server.js';
+import type { ToolRef } from '../../catalog/builder.js';
 import type { ExecResult } from '../../types.js';
 
+interface PythonOpts {
+  timeout?: number;
+  env?: Record<string, string>;
+  bridge?: BridgeServer;
+  toolsByServer?: Record<string, ToolRef[]>;
+  execId?: string;
+}
+
 /** Runs Python code in a stateless uv subprocess. No session state persists between calls. */
-export async function runInPython(
-  code: string,
-  opts: { timeout?: number; env?: Record<string, string> } = {},
-): Promise<ExecResult> {
+export async function runInPython(code: string, opts: PythonOpts = {}): Promise<ExecResult> {
+  const { bridge, toolsByServer, execId = randomUUID() } = opts;
   const tmpFile = join(tmpdir(), `mcp-exec-${randomUUID()}.py`);
   await writeFile(tmpFile, code, 'utf8');
 
+  let pkgDir: string | undefined;
+  let extraEnv: Record<string, string> = {};
+
+  if (bridge && toolsByServer && Object.keys(toolsByServer).length > 0) {
+    const bridgeUrl = `http://127.0.0.1:${bridge.getPort()}/call`;
+    pkgDir = await generateMcpPackage(toolsByServer, bridgeUrl, execId);
+    extraEnv = { PYTHONPATH: pkgDir };
+  }
+
   try {
-    return await spawnPython(tmpFile, opts);
+    const result = await spawnPython(tmpFile, {
+      ...opts,
+      env: { ...opts.env, ...extraEnv },
+    });
+    if (bridge) {
+      result.tool_calls = bridge.flushCalls(execId);
+    }
+    return result;
   } finally {
     await unlink(tmpFile).catch(() => {});
+    if (pkgDir) await removeMcpPackage(pkgDir);
   }
 }
 

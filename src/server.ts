@@ -3,6 +3,7 @@ import { SandboxManager } from '@anthropic-ai/sandbox-runtime';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { BridgeServer } from './bridge/server.js';
 import { buildCatalog } from './catalog/builder.js';
 import { searchTools, setCatalog } from './catalog/index.js';
 import { connectMcpClients, readMcpConfig } from './mcp-clients/index.js';
@@ -59,10 +60,15 @@ async function main() {
     }
   }
 
+  // Start the HTTP bridge so Python scripts can call MCP tools via generated mcp/* imports
+  // biome-ignore lint/suspicious/noExplicitAny: McpClientMap (Client) vs SdkClient duck-type
+  const bridge = new BridgeServer(clients as any);
+  await bridge.start();
+
   // Set up session manager and exec dispatcher
   const sessions = new SessionManager();
   // biome-ignore lint/suspicious/noExplicitAny: McpClientMap (Client) vs duck-type callTool bridge
-  const exec = createExecDispatcher(sessions, clients as any);
+  const exec = createExecDispatcher(sessions, clients as any, bridge, toolsByServer);
 
   // Create MCP server
   const server = new Server(
@@ -158,6 +164,7 @@ async function main() {
 
   process.on('SIGINT', () => {
     sessions.cleanup();
+    bridge.close();
     process.exit(0);
   });
 }
