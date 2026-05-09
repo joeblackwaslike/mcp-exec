@@ -3,11 +3,13 @@
   <img alt="mcp-exec — reduce your token usage by as much as 99%" src="assets/logo-light.svg" width="420">
 </picture>
 
-[![npm version](https://img.shields.io/npm/v/mcp-exec?color=3fb950&label=npm)](https://www.npmjs.com/package/mcp-exec)
+[![npm version](https://img.shields.io/npm/v/%40joeblackwaslike2%2Fmcp-exec?color=3fb950&label=npm)](https://www.npmjs.com/package/@joeblackwaslike2/mcp-exec)
 [![node](https://img.shields.io/badge/node-%E2%89%A520.12-lightgrey)](https://nodejs.org)
 [![platform](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Linux-lightgrey)](#requirements)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![works with](https://img.shields.io/badge/works%20with-Claude%20Code-ea580c)](https://claude.ai/code)
+[![docs](https://img.shields.io/badge/docs-reference-blue)](#reference)
+[![contributing](https://img.shields.io/badge/PRs-welcome-brightgreen)](https://github.com/joeblackwaslike/mcp-exec/issues)
 
 > **Implementation of** ["Code execution with MCP: building more efficient AI agents"](https://www.anthropic.com/engineering/code-execution-with-mcp) — Anthropic Engineering, Nov 2025. The canonical reference for this pattern.
 
