@@ -412,7 +412,7 @@ When completing tasks that require multiple MCP tool calls or large intermediate
 
 > ⚠️ **Note:** Do not use underscores in the server name — use `mcp-exec`, not `mcp_exec`. The Gemini CLI policy parser splits on underscores and will misroute the server identity.
 
-**2.** Add to `GEMINI.md` or `AGENT.md` in your project root:
+**2.** Add to `GEMINI.md` or `AGENTS.md` in your project root:
 
 ```markdown
 ## mcp-exec
