@@ -250,12 +250,21 @@ claude plugin marketplace add joeblackwaslike/agent-marketplace
 claude plugin install mcp-exec
 ```
 
-This registers the MCP server and installs the skills so Claude knows when and how to use them.
+Then prime your CLAUDE.md so the model knows when to use it:
+
+```sh
+npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill          # global (~/.claude/CLAUDE.md)
+npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill --local  # project-level (./CLAUDE.md)
+```
+
+> **Why?** Skills activate ~40% of the time from the skills directory alone. Priming adds a one-line
+> trigger rule to CLAUDE.md that brings reliability to ~90–95%. Run it once and you're set — it's
+> idempotent.
 
 <details>
 <summary>Manual setup</summary>
 
-Add to `.claude/mcp.json`:
+**1. Register the MCP server** — add to `.claude/mcp.json`:
 
 ```json
 {
@@ -268,11 +277,24 @@ Add to `.claude/mcp.json`:
 }
 ```
 
-Then install the skill:
+**2. Prime your CLAUDE.md / AGENTS.md** — appends the activation rule so the model picks up the skill reliably:
 
 ```sh
-npx --package=@joeblackwaslike2/mcp-exec mcp-exec-install-skill          # appends to ~/.claude/CLAUDE.md (global)
-npx --package=@joeblackwaslike2/mcp-exec mcp-exec-install-skill --local  # appends to .claude/CLAUDE.md (project)
+npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill          # global (~/.claude/CLAUDE.md)
+npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill --local  # project-level (./CLAUDE.md)
+```
+
+For Gemini CLI or other agents, copy the rule manually into your `AGENTS.md`:
+
+```markdown
+## Skill Activations
+
+### `mcp-exec` — sandboxed execution + MCP tool search
+
+Activate the `using-mcp-exec` skill when you are about to:
+- Call 2+ MCP tools in sequence where intermediate results don't need to stay in context
+- Do multi-step research, data aggregation, or schema processing
+- Fan out across multiple sources and return a single summary
 ```
 
 </details>
