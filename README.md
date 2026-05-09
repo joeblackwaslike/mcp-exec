@@ -246,6 +246,8 @@ Supported agents: [Claude Code](#claude-code) · [Cursor](#cursor) · [Windsurf]
 
 ### Claude Code
 
+[📖 Claude Code MCP docs](https://docs.anthropic.com/en/docs/claude-code/mcp)
+
 **Via the agent-marketplace (recommended):**
 
 ```sh
@@ -295,6 +297,8 @@ npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill --local  # project
 
 ### Cursor
 
+[📖 Cursor MCP docs](https://docs.cursor.com/context/model-context-protocol)
+
 **1.** Add to `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (global):
 
 ```json
@@ -322,6 +326,8 @@ When completing tasks that require multiple MCP tool calls or large intermediate
 ---
 
 ### Windsurf
+
+[📖 Windsurf MCP docs](https://docs.windsurf.com/windsurf/cascade/mcp)
 
 **1.** Add to `~/.codeium/windsurf/mcp_config.json` (create the file if it doesn't exist):
 
@@ -352,6 +358,8 @@ Restart Windsurf after editing the config file.
 ---
 
 ### GitHub Copilot
+
+[📖 VS Code MCP docs](https://code.visualstudio.com/docs/copilot/customization/mcp-servers)
 
 > Requires VS Code 1.101+ and Copilot agent mode.
 
@@ -385,6 +393,8 @@ When completing tasks that require multiple MCP tool calls or large intermediate
 
 ### Gemini CLI
 
+[📖 Gemini CLI MCP docs](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)
+
 **1.** Add to `~/.gemini/settings.json` (global) or `.gemini/settings.json` (project):
 
 ```json
@@ -415,6 +425,8 @@ When completing tasks that require multiple MCP tool calls or large intermediate
 
 ### Codex CLI
 
+[📖 Codex CLI MCP docs](https://developers.openai.com/codex/mcp)
+
 **1.** Add to `~/.codex/config.toml` (global) or `.codex/config.toml` (project):
 
 ```toml
@@ -437,6 +449,8 @@ When completing tasks that require multiple MCP tool calls or large intermediate
 ---
 
 ### Cline
+
+[📖 Cline MCP docs](https://docs.cline.bot/mcp/configuring-mcp-servers)
 
 **1.** In VS Code, open Cline's settings panel → MCP Servers tab → add a new server:
 
