@@ -1,6 +1,6 @@
 ---
 name: mcp-exec Dev Workflow
-description: Load when building a TypeScript project and about to fetch API docs, process large API responses, run multi-step research, or aggregate data from multiple sources during development
+description: Load when doing research or data work during development — fetching API docs, exploring unfamiliar endpoints, processing large API responses, or aggregating data from multiple sources — and you want intermediate results kept out of context
 version: 0.3.0
 ---
 
