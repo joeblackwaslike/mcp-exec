@@ -1,6 +1,6 @@
 ---
 name: Using mcp-exec
-description: Load when using the exec() or tools() MCP tools from mcp-exec — writing sandboxed code, discovering MCP tools, threading data between runtimes
+description: Load when you need to discover what tools are available across connected MCP servers, or when a multi-step MCP workflow would generate large intermediate results that should stay out of context
 version: 0.3.0
 ---
 
@@ -58,6 +58,23 @@ exec({
   runtime: "bash",
   code: "echo 'hello world' | tr '[:lower:]' '[:upper:]'"
 })
+
+// Python (stateless, uv-isolated): stdout is the result. No MCP imports — use for data processing only.
+exec({
+  runtime: "python",
+  code: `
+# /// script
+# dependencies = ["pandas"]
+# ///
+import pandas as pd, json
+
+with open('/tmp/mcp-exec-data.json') as f:
+    rows = json.load(f)
+
+df = pd.DataFrame(rows)
+print(df.groupby('category')['value'].mean().round(2).to_json())
+`
+})
 ```
 
 ## Session state (Node only)
@@ -110,5 +127,13 @@ if (typeof result.result === 'object' && 'error' in result.result) {
 
 ## When NOT to use mcp-exec
 
-- Simple single-tool calls where the result is small and you want it in context
-- When you need to display raw API output to the user verbatim
+- Single tool call where you want the result in context to reason over directly
+- When a CC `PreToolUse`/`PostToolUse` hook must fire for that specific call
+- Interactive debugging where the user needs to see intermediate state
+- Simple local shell operations (use the Bash tool directly)
+
+## Reference
+
+Full API, session state, bundled packages, and cross-runtime patterns:
+- `ts-sdk-reference.md` — Node.js runtime
+- `py-sdk-reference.md` — Python runtime
