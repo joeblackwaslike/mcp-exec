@@ -1,4 +1,0 @@
-interface:
-  display_name: "mcp-exec Dev Workflow"
-  short_description: "Research and data work during development without polluting context"
-  default_prompt: "Use mcp-exec-dev-workflow to fetch API docs, explore unfamiliar endpoints, process large API responses, or aggregate data from multiple sources during development."

@@ -1,19 +1,26 @@
 ---
-name: Using mcp-exec
-description: Load when you need to discover what tools are available across connected MCP servers, or when a multi-step MCP workflow would generate large intermediate results that should stay out of context
-version: 0.3.0
+name: using-mcp-exec
+description: Use when discovering available MCP tools or when any MCP tool call would return large results you want to keep out of the context window — including single-tool calls
 ---
 
-# mcp-exec
+# using-mcp-exec
 
-Load this skill when using the `tools` or `exec` MCP tools from mcp-exec.
+Core principle: Keep large MCP results out of context — filter and return only what you need.
 
-## What mcp-exec does
+## Decision rule
 
-`mcp-exec` keeps intermediate MCP tool call results out of your context window.
-Instead of calling MCP tools directly, you write short scripts that import MCP
-servers as code modules and run them in a sandboxed environment. Only the final
-output returns to you.
+**Call the tool directly** when:
+- The result is small and you want to reason over the raw output
+- You want a CC `PreToolUse`/`PostToolUse` hook to fire for that specific call
+- Interactive debugging where the user needs to see intermediate state
+
+**Use `exec()`** when:
+- The result would be large (record lists, API responses, file contents, search results)
+- You want to filter, transform, or summarize before returning
+- The workflow touches 2+ tools and intermediate results should stay out of context
+- A single tool call returns more than you need — extract just the relevant fields
+
+The single-tool case matters: one MCP call returning 200 records costs 8,000 tokens if it hits context; `exec()` can reduce it to a 50-token summary.
 
 ## Discovering tools
 
@@ -27,18 +34,16 @@ tools("github pull request")
 tools("drive create document")
 ```
 
-Returns trimmed summaries: `{ server, name, description, signature }`.
-Full schemas are never loaded into context.
+Returns trimmed summaries: `{ server, name, description, signature }`. Full schemas never enter context.
 
 ## Import syntax
 
 ```typescript
-// Import tools from any connected MCP server
 import { searchEmails, sendEmail } from 'mcp/gmail';
 import { searchFiles, createDocument } from 'mcp/gdrive';
 ```
 
-Imports are resolved at runtime — the server names match keys in `.claude/mcp.json`.
+Server names match keys in `.claude/mcp.json`. Imports are resolved at runtime.
 
 ## exec() basics
 
@@ -59,7 +64,7 @@ exec({
   code: "echo 'hello world' | tr '[:lower:]' '[:upper:]'"
 })
 
-// Python (stateless, uv-isolated): stdout is the result. No MCP imports — use for data processing only.
+// Python (stateless, uv-isolated): stdout is the result. No MCP imports — data processing only.
 exec({
   runtime: "python",
   code: `
@@ -79,8 +84,7 @@ print(df.groupby('category')['value'].mean().round(2).to_json())
 
 ## Session state (Node only)
 
-Variables stored on `globalThis` persist across exec() calls in the same conversation.
-Bash is stateless — use explicit data threading for cross-runtime state.
+Variables on `globalThis` persist across `exec()` calls in the same conversation. Bash and Python are stateless — thread data explicitly.
 
 ```typescript
 // Call 1 — fetch and store
@@ -90,7 +94,7 @@ exec({ runtime: "node", code: `
   return globalThis.emails.length + ' emails fetched';
 `});
 
-// Call 2 — use stored state (same session)
+// Call 2 — same session, state persists
 exec({ runtime: "node", code: `
   const urgent = globalThis.emails.filter(e => e.subject.includes('URGENT'));
   return urgent.map(e => e.subject);
@@ -99,24 +103,28 @@ exec({ runtime: "node", code: `
 
 ## Cross-runtime data threading
 
-Bash cannot access Node session globals. Thread data explicitly via `result.stdout`.
+Bash cannot access Node session globals. Thread data via temp files for large payloads.
 
 ```typescript
+// Step 1 (node): fetch and write to temp file
 const nodeResult = await exec({ runtime: "node", code: `
   import { searchFiles } from 'mcp/gdrive';
-  return JSON.stringify(await searchFiles({ query: 'Q4 report' }));
+  import { writeFileSync } from 'fs';
+  const files = await searchFiles({ query: 'Q4 report' });
+  writeFileSync('/tmp/mcp-exec-result.json', JSON.stringify(files));
+  return files.length + ' files written';
 `});
 
+// Step 2 (bash): read from temp file — never interpolate JSON into shell strings
 const filtered = await exec({
   runtime: "bash",
-  code: `echo '${nodeResult.result}' | jq '[.[] | select(.mimeType == "application/pdf") | .name]'`
+  code: `jq '[.[] | select(.mimeType == "application/pdf") | .name]' /tmp/mcp-exec-result.json`
 });
 ```
 
 ## Error handling
 
-Errors are returned as `{ error, line, column }` in the result field.
-Line numbers are relative to your code (preamble offset already subtracted).
+Errors return as `{ error, line, column }`. Line numbers are relative to your code.
 
 ```typescript
 const result = await exec({ runtime: "node", code: `...` });
@@ -125,12 +133,21 @@ if (typeof result.result === 'object' && 'error' in result.result) {
 }
 ```
 
-## When NOT to use mcp-exec
+## Red flags
 
-- Single tool call where you want the result in context to reason over directly
+| Thought | Reality |
+|---|---|
+| "It's just one tool call, not worth the overhead." | If the response is large, `exec()` saves context even for a single call. |
+| "I'll call the tool directly and filter afterwards." | Tokens spent on large responses can't be unspent. Filter inside `exec()`. |
+| "The result is probably small." | Check the tool signature with `tools(query)` first, then decide. |
+| "I need to see the raw output." | Only true if you need to reason over it. If you just need a subset, filter in exec(). |
+
+## When NOT to use exec()
+
+- Single tool call where the result is small and you need to reason over the raw output
 - When a CC `PreToolUse`/`PostToolUse` hook must fire for that specific call
 - Interactive debugging where the user needs to see intermediate state
-- Simple local shell operations (use the Bash tool directly)
+- Simple local shell operations (use Bash tool directly)
 
 ## Reference
 

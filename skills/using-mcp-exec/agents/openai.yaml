@@ -1,4 +1,4 @@
 interface:
   display_name: "mcp-exec"
-  short_description: "Run MCP tools in a sandbox, keep large intermediate results out of context"
-  default_prompt: "Use using-mcp-exec to discover available MCP tools or run multi-tool workflows in a sandboxed environment so only the final output returns to context."
+  short_description: "Run MCP tools in a sandbox, keep large results out of context"
+  default_prompt: "Use using-mcp-exec to discover available MCP tools or run MCP tool calls (single or multi-step) in a sandboxed environment so only the final output returns to context."

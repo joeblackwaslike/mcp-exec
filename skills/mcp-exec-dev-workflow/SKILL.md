@@ -1,24 +1,24 @@
 ---
-name: mcp-exec Dev Workflow
-description: Load when doing research or data work during development — fetching API docs, exploring unfamiliar endpoints, processing large API responses, or aggregating data from multiple sources — and you want intermediate results kept out of context
-version: 0.3.0
+name: mcp-exec-dev-workflow
+description: Use when doing research or data work during development — fetching API docs, exploring endpoints, processing API responses, or aggregating data — and you want intermediate results kept out of context
 ---
 
 # mcp-exec Dev Workflow
 
-Use this skill when actively building a project and needing to do research, explore APIs, or process data. It keeps large intermediate results out of the context window so you stay focused on the work.
+Core principle: fetch → filter/transform → return clean summary. Every intermediate step stays in the sandbox.
 
-## The decision rule
+## Decision rule
 
-**Call the tool directly** when:
-- You need a single small result
-- You want to reason about the raw output
-- You want CC hooks to fire for that tool call
+**Call the tool or fetch directly** when:
+- The result is small and you need to reason over the raw output
+- You want CC hooks to fire for that specific call
 
 **Use `exec()`** when:
-- The workflow touches 2+ tools
-- Intermediate results are large (API docs, search results, lists of records)
+- The response would be large (API docs, search results, record lists)
 - You need to filter, transform, or aggregate before returning
+- Even a single fetch returns more than you need — extract just the relevant part
+
+The key insight: a single HTTP fetch returning 8,000 tokens of API docs can be reduced to a 200-token summary. The 7,800 tokens never enter context.
 
 ## The research workflow pattern
 
@@ -26,29 +26,21 @@ Use this skill when actively building a project and needing to do research, expl
 fetch → filter/transform → return clean summary
 ```
 
-Example: fetching eBay API docs returns 8,000 tokens of spec. With `exec()` you return a 200-token summary of the relevant endpoints. The intermediate 8,000 tokens never touch the context window.
-
 ```typescript
 exec({ runtime: "node", code: `
-  // fetch the full spec — stays in sandbox
   const resp = await fetch('https://developer.ebay.com/api-docs/buy/browse/resources/item_summary/methods/search');
   const html = await resp.text();
-
-  // extract what matters
   const params = html.match(/query parameter.*?<\/tr>/gs)
     ?.map(row => row.replace(/<[^>]+>/g, '').trim())
-    .filter(Boolean)
-    .slice(0, 10);
-
+    .filter(Boolean).slice(0, 10);
   return params?.join('\n') ?? 'no params found';
 `})
-// → "q (string) — keyword search\nlimit (integer) — max results\n..."
-// 200 tokens, not 8,000
+// → 200 tokens returned, not 8,000
 ```
 
 ## Common dev task recipes
 
-### API exploration — summarize a response shape
+### API exploration — summarize response shape
 
 ```typescript
 exec({ runtime: "node", code: `
@@ -76,12 +68,10 @@ exec({ runtime: "node", code: `
     fetch('https://api.source1.com/search?q=query').then(r => r.json()),
     fetch('https://api.source2.com/search?q=query').then(r => r.json()),
   ]);
-
   const merged = [
     ...source1.items.map(i => ({ source: 'source1', price: i.price })),
     ...source2.results.map(i => ({ source: 'source2', price: i.salePrice })),
   ].sort((a, b) => a.price - b.price);
-
   const median = merged[Math.floor(merged.length / 2)].price;
   return { median, count: merged.length, range: [merged[0].price, merged.at(-1).price] };
 `})
@@ -95,10 +85,8 @@ exec({ runtime: "node", code: `
     fetch('https://api.prod.example.com/schema').then(r => r.json()),
     fetch('https://api.staging.example.com/schema').then(r => r.json()),
   ]);
-
   const prodKeys = new Set(Object.keys(prod.properties ?? {}));
   const stagingKeys = new Set(Object.keys(staging.properties ?? {}));
-
   return {
     onlyInProd: [...prodKeys].filter(k => !stagingKeys.has(k)),
     onlyInStaging: [...stagingKeys].filter(k => !prodKeys.has(k)),
@@ -115,7 +103,7 @@ exec({ runtime: "node", code: `
   const resp = await fetch('https://api.example.com/records?limit=5000');
   const rows = await resp.json();
   writeFileSync('/tmp/mcp-exec-rows.json', JSON.stringify(rows));
-  return rows.length + ' rows written to /tmp/mcp-exec-rows.json'; // Node: return value is the exec() output
+  return rows.length + ' rows written to /tmp/mcp-exec-rows.json';
 `})
 
 // Step 2 (python): analyze with pandas, return summary
@@ -130,15 +118,24 @@ with open('/tmp/mcp-exec-rows.json') as f:
 
 df = pd.DataFrame(data)
 summary = df.groupby('category')['price'].agg(['mean', 'count']).round(2)
-print(summary.to_json())  # Python: stdout is the exec() output
+print(summary.to_json())
 `})
 ```
 
+## Red flags
+
+| Thought | Reality |
+|---|---|
+| "This is just one fetch, not worth the overhead." | A single fetch returning docs or records is exactly the case `exec()` is designed for. |
+| "I'll skim the large response myself." | You can't unspend the tokens. Filter before returning. |
+| "The API docs are probably short." | They never are. Always fetch through `exec()`. |
+| "I only need to filter once." | Filter in the sandbox, return the clean result. |
+
 ## Project setup
 
-1. **Install the plugin** via Claude Code's plugin system — auto-wires the MCP server into your conversation
-2. **Run `/mcp-exec-install-skill`** to append the mcp-exec skill to your project's `CLAUDE.md`
-3. **Add a `sandbox` block** to `.claude/settings.json` listing the domains your MCP servers and `fetch` calls need:
+1. Install plugin via Claude Code's plugin system — auto-wires the MCP server
+2. Run `/mcp-exec-prime-skill` to append the skill activation to your project's `CLAUDE.md`
+3. Add a `sandbox` block to `.claude/settings.json` listing domains your fetch calls need:
 
 ```json
 {
@@ -153,14 +150,14 @@ print(summary.to_json())  # Python: stdout is the exec() output
 }
 ```
 
-Without a `sandbox` block, all outbound network is blocked by default. You must explicitly list every domain.
+Without a `sandbox` block, all outbound network is blocked by default.
 
 ## When NOT to use exec()
 
-- Single tool call where you want the result in context to reason over directly
-- When a CC `PreToolUse`/`PostToolUse` hook must fire for that specific downstream tool call
+- Single call where the result is small and you want the raw output in context
+- When a CC `PreToolUse`/`PostToolUse` hook must fire for that specific call
 - Interactive debugging where the user needs to see intermediate state
-- Simple stdout/stderr from a local process (use the Bash tool directly)
+- Simple local shell operations (use Bash tool directly)
 
 ## Reference
 
