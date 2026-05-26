@@ -40,7 +40,7 @@ Mid-workflow. Claude's working. Three more tool calls to go. Then:
 
 The tool calls worked. Claude ran out of room to think.
 
-mcp-exec fixes this architecturally — intermediate data never touches context.
+mcp-exec fixes this architecturally — you decide what enters context, and everything else stays in the sandbox.
 
 ---
 
@@ -230,6 +230,49 @@ print(summary.head(5).to_json())
 
 ---
 
+### Single-tool filtering — control what enters context
+
+You don't need a multi-step workflow to benefit from mcp-exec. A single tool call that returns more than you need is the perfect use case.
+
+**The pattern:** call the tool inside `exec()`, pipe the result through bash, jq, or Python, and return only what matters. The raw response never enters context.
+
+**"Give me the last 5 error lines":**
+
+```typescript
+exec({
+  runtime: "node",
+  code: `
+    import { getLogs } from 'mcp/observability';
+    const logs = await getLogs({ service: 'api', limit: 500 });
+    return logs.filter(l => l.level === 'error').slice(-5).map(l => l.message);
+  `
+})
+// → ["Connection refused", "Timeout after 5000ms", ...]   tokens used: ~30
+// Without exec: 500 log lines = ~8,000 tokens
+```
+
+**"What's the median deal size?":**
+
+```python
+exec({
+  "runtime": "python",
+  "code": """
+# /// script
+# dependencies = ["statistics"]
+# ///
+import json, sys, statistics
+records = json.loads(sys.argv[1])
+print(statistics.median(r['amount'] for r in records))
+"""
+})
+# → "47500.0"   tokens used: ~15
+# Without exec: 1,000 CRM records = ~40,000 tokens
+```
+
+The idea scales to anything: run a search and return the top 3 titles, fetch a config file and extract one key, pull a calendar and count today's events. Every case where a tool returns walls of data and you need a fact — `exec()` is the right tool.
+
+---
+
 ## Reproducible case study
 
 The numbers above are real. You can verify them yourself in 5 minutes.
@@ -319,10 +362,11 @@ npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill --local  # project
 ```
 ## mcp-exec
 
-When completing tasks that require multiple MCP tool calls or large intermediate data:
-- Use tools(query) to discover available tools without loading full schemas into context
-- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
-- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+Use exec(code, runtime) whenever a tool call or workflow would return more tokens than you need:
+- Single tool returning too much? Wrap it in exec() and filter with bash or Python — only your output enters context
+- Multi-step workflow? Chain tool calls inside exec() — intermediate data never touches context
+- Runtimes: "node" (stateful via globalThis, MCP imports), "bash" (pipe/filter), "python" (analysis, PyPI via PEP 723)
+Use tools(query) to search available MCP tools without loading full schemas into context.
 ```
 
 ---
@@ -349,10 +393,11 @@ When completing tasks that require multiple MCP tool calls or large intermediate
 ```
 ## mcp-exec
 
-When completing tasks that require multiple MCP tool calls or large intermediate data:
-- Use tools(query) to discover available tools without loading full schemas into context
-- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
-- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+Use exec(code, runtime) whenever a tool call or workflow would return more tokens than you need:
+- Single tool returning too much? Wrap it in exec() and filter with bash or Python — only your output enters context
+- Multi-step workflow? Chain tool calls inside exec() — intermediate data never touches context
+- Runtimes: "node" (stateful via globalThis, MCP imports), "bash" (pipe/filter), "python" (analysis, PyPI via PEP 723)
+Use tools(query) to search available MCP tools without loading full schemas into context.
 ```
 
 Restart Windsurf after editing the config file.
@@ -385,10 +430,12 @@ Restart Windsurf after editing the config file.
 ```markdown
 ## mcp-exec
 
-When completing tasks that require multiple MCP tool calls or large intermediate data:
-- Use tools(query) to discover available tools without loading full schemas into context
-- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
-- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+Use `exec(code, runtime)` whenever a tool call or workflow would return more tokens than you need:
+- **Single tool returning too much?** Wrap it in `exec()` and filter with bash or Python — only your output enters context
+- **Multi-step workflow?** Chain tool calls inside `exec()` — intermediate data never touches context
+- **Runtimes:** `"node"` (stateful, MCP imports), `"bash"` (pipe/filter), `"python"` (analysis, PyPI via PEP 723)
+
+Use `tools(query)` to search available MCP tools without loading full schemas into context.
 ```
 
 ---
@@ -417,10 +464,12 @@ When completing tasks that require multiple MCP tool calls or large intermediate
 ```markdown
 ## mcp-exec
 
-When completing tasks that require multiple MCP tool calls or large intermediate data:
-- Use tools(query) to discover available tools without loading full schemas into context
-- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
-- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+Use `exec(code, runtime)` whenever a tool call or workflow would return more tokens than you need:
+- **Single tool returning too much?** Wrap it in `exec()` and filter with bash or Python — only your output enters context
+- **Multi-step workflow?** Chain tool calls inside `exec()` — intermediate data never touches context
+- **Runtimes:** `"node"` (stateful, MCP imports), `"bash"` (pipe/filter), `"python"` (analysis, PyPI via PEP 723)
+
+Use `tools(query)` to search available MCP tools without loading full schemas into context.
 ```
 
 ---
@@ -442,10 +491,12 @@ args = ["@joeblackwaslike2/mcp-exec"]
 ```markdown
 ## mcp-exec
 
-When completing tasks that require multiple MCP tool calls or large intermediate data:
-- Use tools(query) to discover available tools without loading full schemas into context
-- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
-- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+Use `exec(code, runtime)` whenever a tool call or workflow would return more tokens than you need:
+- **Single tool returning too much?** Wrap it in `exec()` and filter with bash or Python — only your output enters context
+- **Multi-step workflow?** Chain tool calls inside `exec()` — intermediate data never touches context
+- **Runtimes:** `"node"` (stateful, MCP imports), `"bash"` (pipe/filter), `"python"` (analysis, PyPI via PEP 723)
+
+Use `tools(query)` to search available MCP tools without loading full schemas into context.
 ```
 
 ---
@@ -472,10 +523,11 @@ When completing tasks that require multiple MCP tool calls or large intermediate
 ```
 ## mcp-exec
 
-When completing tasks that require multiple MCP tool calls or large intermediate data:
-- Use tools(query) to discover available tools without loading full schemas into context
-- Use exec(code, runtime) to run multi-step orchestration in a sandbox — only the final return value enters context
-- Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
+Use exec(code, runtime) whenever a tool call or workflow would return more tokens than you need:
+- Single tool returning too much? Wrap it in exec() and filter with bash or Python — only your output enters context
+- Multi-step workflow? Chain tool calls inside exec() — intermediate data never touches context
+- Runtimes: "node" (stateful via globalThis, MCP imports), "bash" (pipe/filter), "python" (analysis, PyPI via PEP 723)
+Use tools(query) to search available MCP tools without loading full schemas into context.
 ```
 
 ---
@@ -550,9 +602,9 @@ if (typeof result === 'object' && result !== null && 'error' in result) {
 
 ## When NOT to use mcp-exec
 
-- Single-tool calls where the result is small and you want it visible in context
-- When you need to display raw API output verbatim to the user
-- Interactive tool calls where the user needs to confirm intermediate results
+- Tool calls where the result is small and you want it visible in context
+- When you need the raw API output verbatim in context (display, inline citation, etc.)
+- Interactive flows where the user needs to see and confirm intermediate results
 
 ---
 
