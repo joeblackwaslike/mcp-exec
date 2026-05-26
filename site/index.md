@@ -84,7 +84,7 @@ claude plugin marketplace add joeblackwaslike/agent-marketplace
 claude plugin install mcp-exec
 ```
 
-[→ Full installation guide](/guide/installation) — includes setup for Cursor, Windsurf, GitHub Copilot, Gemini CLI, Codex CLI, and Cline.
+[→ Full installation guide](/guide/installation) — includes setup for Cursor, Windsurf, GitHub Copilot, Gemini CLI, Codex CLI, Cline, and OpenCode.
 
 ## Reproducible benchmark
 

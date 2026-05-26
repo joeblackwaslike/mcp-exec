@@ -223,6 +223,39 @@ When completing tasks that require multiple MCP tool calls or large intermediate
 - Runtimes: "node" (stateful via globalThis), "bash" (stateless), "python" (stateless, supports PyPI via PEP 723)
 ```
 
+== OpenCode
+
+[OpenCode](https://opencode.ai) uses a plugin system for MCP server and skill registration.
+
+**1.** Register the MCP server — add to `opencode.json` in your project root (create it if it doesn't exist):
+
+```json
+{
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"]
+    }
+  },
+  "plugins": [".opencode/plugins/mcp-exec.js"]
+}
+```
+
+**2.** Add the plugin bootstrap file — copy `.opencode/plugins/mcp-exec.js` from the mcp-exec repo into your project:
+
+```sh
+mkdir -p .opencode/plugins
+curl -sSL https://raw.githubusercontent.com/joeblackwaslike/mcp-exec/main/.opencode/plugins/mcp-exec.js \
+  -o .opencode/plugins/mcp-exec.js
+```
+
+The plugin does two things automatically:
+
+- Registers the `skills/` directory so OpenCode discovers mcp-exec skills
+- Injects the `using-mcp-exec` skill bootstrap into the first user message of each session
+
+Skills are auto-discovered — no manual skill loading needed. The `exec()` and `tools()` tools are available as soon as the session starts.
+
 :::
 
 ## Requirements

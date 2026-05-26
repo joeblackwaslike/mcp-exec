@@ -285,7 +285,7 @@ Our run: **43,800 tokens → 90 tokens (99.8% reduction)** on a PR staleness nud
 
 ## Installation
 
-Supported agents: [Claude Code](#claude-code) · [Cursor](#cursor) · [Windsurf](#windsurf) · [GitHub Copilot](#github-copilot) · [Gemini CLI](#gemini-cli) · [Codex CLI](#codex-cli) · [Cline](#cline)
+Supported agents: [Claude Code](#claude-code) · [Cursor](#cursor) · [Windsurf](#windsurf) · [GitHub Copilot](#github-copilot) · [Gemini CLI](#gemini-cli) · [Codex CLI](#codex-cli) · [Cline](#cline) · [OpenCode](#opencode)
 
 ---
 
@@ -532,6 +532,36 @@ Use tools(query) to search available MCP tools without loading full schemas into
 
 ---
 
+### OpenCode
+
+[📖 OpenCode plugin docs](https://opencode.ai/docs/plugins)
+
+**1.** Add to `opencode.json` in your project root:
+
+```json
+{
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"]
+    }
+  },
+  "plugins": [".opencode/plugins/mcp-exec.js"]
+}
+```
+
+**2.** Copy the bootstrap plugin file:
+
+```sh
+mkdir -p .opencode/plugins
+curl -sSL https://raw.githubusercontent.com/joeblackwaslike/mcp-exec/main/.opencode/plugins/mcp-exec.js \
+  -o .opencode/plugins/mcp-exec.js
+```
+
+Skills are auto-discovered. The `using-mcp-exec` skill is injected into the first user message automatically — no manual priming needed.
+
+---
+
 ## Skills
 
 mcp-exec ships two Claude Code skills that activate automatically on install.
@@ -583,7 +613,7 @@ exec({
 
 **Bash:** stateless subprocess. stdout becomes `result`.
 
-**Python:** stateless via `uv run --isolated`. Declare dependencies inline with [PEP 723](https://peps.python.org/pep-0723/). stdout becomes `result`. MCP tools not available from Python (pass data via temp files or env vars).
+**Python:** stateless via `uv run --isolated`. Declare dependencies inline with [PEP 723](https://peps.python.org/pep-0723/). stdout becomes `result`. MCP tools available via HTTP bridge: `from mcp.github import list_pull_requests`.
 
 ### Session state
 
@@ -637,7 +667,7 @@ Node runtime uses `vm.Context` and does not spawn a subprocess, so its env expos
 | v0.1 | ✅ | Node + Bash runtimes, MCP shim loader hooks, `tools` + `exec`, implicit sessions |
 | v0.2 | ✅ | Generic MCP shim generator, lazy tool catalog, TypeScript SDK reference |
 | v0.3 | ✅ | Python runtime via `uv run --isolated`, Python SDK reference, plugin polish |
-| v1.0 | planned | Token benchmark CI suite, state persistence, per-workflow telemetry |
+| v1.0 | ✅ | Token benchmark CI suite, cross-tool compatibility (Gemini/Codex/OpenCode), Python MCP imports, env allowlist CLI |
 
 ## For app developers
 

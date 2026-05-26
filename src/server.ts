@@ -72,7 +72,7 @@ async function main() {
 
   // Create MCP server
   const server = new Server(
-    { name: 'mcp-exec', version: '0.3.0' },
+    { name: 'mcp-exec', version: '1.0.0' },
     { capabilities: { tools: {} } },
   );
 

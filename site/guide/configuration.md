@@ -153,7 +153,37 @@ exec({
 
 Default timeout is 10 seconds. Set `timeout` in milliseconds.
 
+## Environment variables
+
+By default, sandbox exec calls only receive a safe subset of environment variables from your shell. This prevents credentials and API keys from leaking into sandboxed code unintentionally.
+
+The allowlist is controlled by `sandbox.env.allow` in your settings file:
+
+```json
+{
+  "sandbox": {
+    "env": {
+      "allow": ["PATH", "HOME", "TMPDIR", "USER", "SHELL", "GITHUB_TOKEN"]
+    }
+  }
+}
+```
+
+**Default allowlist:** `PATH`, `HOME`, `TMPDIR`, `TMP`, `TEMP`, `USER`, `USERNAME`, `LANG`, `LC_ALL`, `LC_CTYPE`, `NODE_PATH`, `SHELL`
+
+Everything else is blocked unless explicitly added. Use the `mcp-exec env` CLI to manage the allowlist interactively instead of editing the JSON by hand:
+
+```bash
+mcp-exec env list                        # see what passes vs blocks
+mcp-exec env add GITHUB_TOKEN            # add a var
+mcp-exec env remove LINEAR_API_KEY       # remove a var
+mcp-exec env reset                       # restore defaults
+```
+
+See the [CLI Reference →](/guide/cli#mcp-exec-env) for the full command reference.
+
 ## Next steps
 
+- [CLI Reference →](/guide/cli) — manage env allowlist and skill activation from the command line
 - [exec() API reference →](/manual/exec)
 - [tools() API reference →](/manual/tools)
