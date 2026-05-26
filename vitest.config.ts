@@ -10,6 +10,7 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: [
         'src/**/*.test.ts',
+        'src/benchmarks/**',
         // server.ts is a process entry point tested via subprocess integration test —
         // v8 coverage profiler cannot instrument a child process.
         'src/server.ts',

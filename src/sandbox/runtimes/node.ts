@@ -41,6 +41,14 @@ export async function runInNode(
   // and correctly isolates output across concurrent exec() calls.
   context.console = makeCapturedConsole(stdoutChunks, stderrChunks);
 
+  // Shim modules loaded via USE_MAIN_CONTEXT_DEFAULT_LOADER run in the main
+  // context (globalThis !== vm context), so they can't see __mcpClients on the
+  // vm context. Bridge the clients to the main globalThis for the duration of
+  // this call so shim functions dispatch to the right clients.
+  const g = globalThis as Record<string, unknown>;
+  const prevMcpClients = g.__mcpClients;
+  g.__mcpClients = (context as Record<string, unknown>).__mcpClients;
+
   try {
     const wrapped = wrapCode(code);
     const returnValue = await vm.runInContext(wrapped, context, {
@@ -69,5 +77,7 @@ export async function runInNode(
       exitCode: 1,
       tool_calls,
     };
+  } finally {
+    g.__mcpClients = prevMcpClients;
   }
 }
