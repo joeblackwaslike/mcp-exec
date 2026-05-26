@@ -17,26 +17,21 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const DIST_SERVER = join(root, 'dist/src/server.js');
 const DIST_PRIME = join(root, 'dist/bin/prime-skill.js');
 
-const GREEN = '\x1b[32m';
-const RED = '\x1b[31m';
-const BOLD = '\x1b[1m';
-const DIM = '\x1b[2m';
-const RESET = '\x1b[0m';
+const _GREEN = '\x1b[32m';
+const _RED = '\x1b[31m';
+const _BOLD = '\x1b[1m';
+const _DIM = '\x1b[2m';
+const _RESET = '\x1b[0m';
 
 let failures = 0;
 
-function pass(msg) {
-  console.log(`  ${GREEN}✓${RESET} ${msg}`);
-}
+function pass(_msg) {}
 
-function fail(msg) {
-  console.error(`  ${RED}✗${RESET} ${msg}`);
+function fail(_msg) {
   failures++;
 }
 
-function section(title) {
-  console.log(`\n${BOLD}${title}${RESET}`);
-}
+function section(_title) {}
 
 function contentOf(result) {
   return result.content;
@@ -46,11 +41,9 @@ function contentOf(result) {
 section('1. Build output');
 
 if (!existsSync(DIST_SERVER)) {
-  console.error(`${RED}✗ dist/src/server.js not found.${RESET} Run: npm run build`);
   process.exit(1);
 }
 if (!existsSync(DIST_PRIME)) {
-  console.error(`${RED}✗ dist/bin/prime-skill.js not found.${RESET} Run: npm run build`);
   process.exit(1);
 }
 pass('dist/src/server.js');
@@ -149,7 +142,9 @@ try {
   if (persistParsed.result === 99) {
     pass('exec(node): globalThis persists across calls within same session_id');
   } else {
-    fail(`exec(node) session persistence: expected 99, got ${JSON.stringify(persistParsed.result)}`);
+    fail(
+      `exec(node) session persistence: expected 99, got ${JSON.stringify(persistParsed.result)}`,
+    );
   }
 
   // tools query
@@ -165,13 +160,8 @@ try {
 } finally {
   await client.close().catch(() => {});
 }
-
-// ─── Result ───────────────────────────────────────────────────────────────────
-console.log('');
 if (failures === 0) {
-  console.log(`${GREEN}${BOLD}✓ All smoke tests passed${RESET} ${DIM}(built binary verified)${RESET}\n`);
   process.exit(0);
 } else {
-  console.error(`${RED}${BOLD}✗ ${failures} smoke test(s) failed${RESET}\n`);
   process.exit(1);
 }

@@ -36,7 +36,7 @@ sandbox is opaque to CC's hook dispatch.
 ### Plugin compatibility checker (v0.2, planned)
 
 ```sh
-npx --package=@joeblackwaslike2/mcp-exec mcp-exec-check-plugins
+npx @joeblackwaslike2/mcp-exec mcp-exec-check-plugins
 ```
 
 Scans `~/.claude/settings.json` and `.claude/settings.json` for hooks that watch
@@ -90,16 +90,16 @@ mcp-exec reduces system prompt size, which has a positive effect on CC's prefix 
 
 **Use mcp-exec (`exec`) when:**
 
-- The workflow touches 3+ tools and intermediate results are large (lists, documents,
+- The workflow touches tools and intermediate results are large (lists, documents,
   search results)
-- You want to keep intermediate data out of the context window entirely
+- You want to keep intermediate data out of the context window entirely or at least reduce what enters the context.
 - You need stateful computation across multiple tool calls (filtering, aggregating,
   transforming)
 - You want cross-runtime composition (e.g. fetch with Node, post-process with bash/jq)
 
 **Use direct tool calls when:**
 
-- You need a single tool result and plan to reason over it directly
+- You need a single tool result with a small output and plan to reason over it directly
 - The intermediate result is small and you want Claude to see it
 - You need CC hook events to fire for every downstream tool call (e.g. for audit
   logging via hooks that cannot read `tool_calls` metadata)
