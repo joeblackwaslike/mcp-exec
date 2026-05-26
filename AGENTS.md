@@ -39,6 +39,17 @@ import { toolName } from 'mcp/server-name';
 
 Server names match keys in `.claude/mcp.json` or your Codex MCP config.
 
+## Documentation
+
+Full docs: **https://joeblackwaslike.github.io/mcp-exec/**
+
+- [Guide](https://joeblackwaslike.github.io/mcp-exec/docs/guide/introduction) — Introduction, Installation, Getting Started, Configuration, CLI, Security
+- [User Manual](https://joeblackwaslike.github.io/mcp-exec/docs/manual/tools) — tools(), exec(), Runtimes, Sessions, Examples
+- [Developer](https://joeblackwaslike.github.io/mcp-exec/docs/developer/architecture) — Architecture, Plugin Compatibility, Observability, Codex Sandboxing
+- [Reference](https://joeblackwaslike.github.io/mcp-exec/docs/reference/competitive-analysis) — Competitive Analysis, Case Study, Projects Featured In, Changelog
+
+Codex-specific sandboxing: [Developer → Codex Sandboxing](https://joeblackwaslike.github.io/mcp-exec/docs/developer/codex-sandboxing)
+
 ## Stack
 
 TypeScript / Node.js. See `CLAUDE.md` for full project context and architecture details.

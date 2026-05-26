@@ -1,0 +1,2283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mcp-exec · How It Works</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080e1a;--bg1:#0f1a2e;--bg2:#162032;--bg3:#1c2940;
+  --border:#1e3452;--borderhi:#2d4d7a;
+  --text:#dde6f0;--muted:#7a9ab8;--dim:#3d5a78;
+  --sky:#38bdf8;--green:#4ade80;--orange:#fb923c;
+  --purple:#c084fc;--pink:#f472b6;--red:#f87171;--indigo:#818cf8;
+  --r:10px;--rsm:6px;
+  --mono:'SF Mono','JetBrains Mono','Fira Code',Consolas,monospace;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',sans-serif;font-size:14px;line-height:1.6;overflow-x:hidden}
+h1{font-size:2.4rem;font-weight:800;letter-spacing:-.03em}
+h2{font-size:1.2rem;font-weight:700;letter-spacing:-.01em}
+h3{font-size:1rem;font-weight:600}
+code,pre,tt{font-family:var(--mono)}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;background:rgba(8,14,26,.95);backdrop-filter:blur(14px);border-bottom:1px solid var(--border);padding:8px 0}
+.nav-inner{display:flex;align-items:center;gap:4px;padding:0 20px;overflow-x:auto;scrollbar-width:none}
+.nav-inner::-webkit-scrollbar{display:none}
+.nav-logo{font-size:.95rem;font-weight:800;color:var(--sky);text-decoration:none;white-space:nowrap;margin-right:10px}
+.nav-logo span{color:var(--muted);font-weight:400}
+.nav-sep{color:var(--border);margin:0 2px;font-size:10px}
+.nav-link{display:flex;align-items:center;gap:3px;padding:3px 9px;border-radius:16px;color:var(--muted);text-decoration:none;white-space:nowrap;font-size:11.5px;transition:all .15s;border:1px solid transparent}
+.nav-link:hover,.nav-link.active{color:var(--text);background:var(--bg2);border-color:var(--border)}
+
+/* HERO */
+.hero{padding:64px 0 48px;text-align:center}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 14px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:20px;color:var(--sky);font-size:12px;font-weight:500;margin-bottom:16px}
+.hero h1{margin-bottom:12px;background:linear-gradient(130deg,#e2e8f0 0%,#38bdf8 60%,#818cf8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:1rem;color:var(--muted);max-width:580px;margin:0 auto 36px}
+.container{max-width:1160px;margin:0 auto;padding:0 24px}
+
+/* WHY GRID */
+.why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:860px;margin:0 auto 32px;text-align:left}
+@media(max-width:740px){.why-grid{grid-template-columns:1fr}}
+.why-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r);padding:20px}
+.why-card h3{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px}
+.why-card p{font-size:.88rem;color:var(--text);line-height:1.6}
+.why-card.problem h3{color:var(--red)}
+.why-card.solution h3{color:var(--sky)}
+.why-card.payoff h3{color:var(--green)}
+
+/* CONTEXT BARS */
+.ctx-compare{display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:680px;margin:0 auto 24px}
+@media(max-width:600px){.ctx-compare{grid-template-columns:1fr}}
+.ctx-card{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r);padding:18px}
+.ctx-card h3{margin-bottom:12px;font-size:.85rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.ctx-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:11px}
+.ctx-lbl{width:100px;color:var(--muted);flex-shrink:0;font-family:var(--mono);font-size:10px;text-align:right}
+.ctx-bg{flex:1;height:16px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.ctx-bar{height:100%;border-radius:3px;transition:width .8s ease}
+.ctx-val{width:65px;text-align:right;font-size:10px;font-family:var(--mono);color:var(--dim)}
+
+/* INSTALL SNIPPET */
+.install-snippet{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px;max-width:520px;margin:0 auto;font-family:var(--mono);font-size:12px;color:var(--muted);text-align:left}
+.install-snippet .cmd{color:var(--green)}
+.install-snippet .cmt{color:var(--dim)}
+
+/* SECTIONS */
+.section{padding:52px 0;border-top:1px solid var(--border);scroll-margin-top:50px}
+.sect-hdr{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.sect-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--bg2);border:1px solid var(--border);flex-shrink:0}
+.sect-sub{color:var(--muted);font-size:.9rem;margin-bottom:24px;max-width:640px}
+
+/* GRAPH */
+.graph-wrap{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.graph-top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border)}
+.graph-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.graph-ctrls{display:flex;gap:8px;align-items:center}
+.btn{padding:4px 13px;border-radius:5px;border:1px solid;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;transition:all .15s;outline:none;background:transparent}
+.btn-play{border-color:rgba(56,189,248,.4);color:var(--sky)}
+.btn-play:hover{background:rgba(56,189,248,.1)}
+.btn-play:disabled{opacity:.35;cursor:not-allowed}
+.btn-reset{border-color:rgba(122,154,184,.3);color:var(--muted)}
+.btn-reset:hover{background:var(--bg2)}
+.btn-fit{border-color:rgba(122,154,184,.3);color:var(--muted)}
+.btn-fit:hover{background:var(--bg2)}
+
+/* BEFORE/AFTER */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+@media(max-width:740px){.ba{grid-template-columns:1fr}}
+.ba-panel{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.ba-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.ba-hdr.before{color:var(--red);background:rgba(248,113,113,.04)}
+.ba-hdr.after{color:var(--green);background:rgba(74,222,128,.04)}
+.tok{font-family:var(--mono);font-size:10px;background:var(--bg2);padding:2px 7px;border-radius:4px}
+.tok.hi{color:var(--red)}.tok.lo{color:var(--green)}
+.ba-body{padding:14px}
+.lbl{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+.cb{background:var(--bg);border:1px solid var(--border);border-radius:var(--rsm);padding:11px 13px;font-family:var(--mono);font-size:11px;line-height:1.5;margin-bottom:11px;overflow-x:auto;white-space:pre}
+.cb .k{color:var(--purple)}.cb .s{color:var(--green)}.cb .p{color:var(--sky)}
+.cb .n{color:var(--orange)}.cb .c{color:var(--dim)}.cb .f{color:#facc15}.cb .hl{color:var(--red)}
+.ob{background:var(--bg);border:1px solid;border-radius:var(--rsm);padding:11px 13px;font-family:var(--mono);font-size:11px;line-height:1.5;position:relative;overflow:hidden;max-height:90px}
+.ob.raw{border-color:rgba(248,113,113,.2)}.ob.compact{border-color:rgba(74,222,128,.2)}
+.ob-fade{position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg))}
+.savings{display:flex;align-items:center;gap:8px;padding:7px 11px;background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.18);border-radius:var(--rsm);font-size:11.5px;color:var(--green);margin-top:8px}
+.savings b{font-family:var(--mono);font-size:13px}
+
+/* LEGEND */
+.legend-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.legend-item{display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--bg1);border:1px solid var(--border);border-radius:20px;font-size:11px;cursor:pointer;transition:border-color .15s}
+.legend-item:hover{border-color:var(--borderhi)}
+.legend-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.legend-icon{font-family:var(--mono);font-size:10px;opacity:.8}
+.legend-name{color:var(--muted)}
+.edge-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.edge-item{display:flex;align-items:center;gap:6px;font-size:11px}
+.edge-line{width:28px;height:2px;border-radius:1px;flex-shrink:0}
+
+/* PROPERTY PANEL */
+#prop-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;opacity:0;pointer-events:none;transition:opacity .2s}
+#prop-overlay.open{opacity:1;pointer-events:auto}
+#prop-panel{position:fixed;top:0;right:0;height:100%;width:320px;background:var(--bg1);border-left:1px solid var(--border);z-index:201;transform:translateX(100%);transition:transform .25s ease;overflow-y:auto;padding:0 0 40px}
+#prop-panel.open{transform:translateX(0)}
+.pp-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg1)}
+.pp-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:4px}
+.pp-close:hover{color:var(--text)}
+.pp-badge{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;font-family:var(--mono)}
+.pp-body{padding:16px}
+.pp-uri{font-family:var(--mono);font-size:11px;color:var(--sky);margin-bottom:14px;word-break:break-all}
+.pp-table{width:100%;border-collapse:collapse}
+.pp-table tr{border-bottom:1px solid var(--border)}
+.pp-table td{padding:7px 0;vertical-align:top;font-size:11.5px}
+.pp-table td:first-child{color:var(--muted);width:38%;font-family:var(--mono);font-size:10.5px;padding-right:8px;white-space:nowrap}
+.pp-table td:last-child{color:var(--text);word-break:break-word;font-family:var(--mono)}
+.pp-section{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:14px 0 6px}
+
+/* TWO-COL LAYOUT */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+@media(max-width:900px){.two-col{grid-template-columns:1fr}}
+
+/* STATE MACHINE */
+.state-machine{display:flex;flex-direction:column;gap:0}
+.states-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:16px}
+.state-box{padding:10px 20px;border-radius:8px;border:2px solid;font-size:12px;font-weight:700;font-family:var(--mono);cursor:pointer;transition:all .2s;text-align:center;min-width:100px}
+.state-box.active{box-shadow:0 0 0 3px rgba(255,255,255,.2)}
+.state-arrow{text-align:center;color:var(--dim);font-size:11px;margin:2px 0}
+.state-desc{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px;font-size:12px;color:var(--muted)}
+
+/* SWIMLANE */
+.swimlane{background:var(--bg1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.swimlane-hdr{display:flex;border-bottom:1px solid var(--border)}
+.sl-lane-hdr{flex:1;padding:10px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-right:1px solid var(--border);text-align:center}
+.sl-lane-hdr:last-child{border-right:none}
+.swimlane svg{display:block}
+
+/* REFERENCE TABLE */
+.ref-table{width:100%;border-collapse:collapse;font-size:12px}
+.ref-table th{background:var(--bg2);padding:9px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid var(--border)}
+.ref-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+.ref-table tr:hover td{background:var(--bg2)}
+.ref-table td:first-child{font-family:var(--mono);font-size:11px;color:var(--sky);white-space:nowrap}
+.rt-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;font-family:var(--mono)}
+.rt-yes{background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.25)}
+.rt-no{background:rgba(248,113,113,.1);color:var(--red);border:1px solid rgba(248,113,113,.25)}
+.rt-partial{background:rgba(251,146,60,.1);color:var(--orange);border:1px solid rgba(251,146,60,.25)}
+
+/* STEPS */
+.steps{display:flex;flex-direction:column;gap:16px}
+.step{display:flex;gap:16px;align-items:flex-start}
+.step-num{width:32px;height:32px;border-radius:50%;background:var(--bg2);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:var(--sky);flex-shrink:0;margin-top:2px}
+.step-body h3{margin-bottom:6px;font-size:.95rem}
+.step-body p{color:var(--muted);font-size:.88rem;margin-bottom:8px}
+.step-body .cb{margin-bottom:0}
+
+/* CALLOUT */
+.callout{background:var(--bg2);border-left:3px solid var(--sky);border-radius:0 var(--rsm) var(--rsm) 0;padding:12px 16px;font-size:.88rem;color:var(--muted);margin:14px 0}
+.callout.warn{border-left-color:var(--orange)}
+.callout.green{border-left-color:var(--green)}
+.callout strong{color:var(--text)}
+
+/* TABS */
+.tab-bar{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto}
+.tab-btn{padding:7px 14px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;white-space:nowrap;transition:all .15s}
+.tab-btn.active,.tab-btn:hover{color:var(--text);border-bottom-color:var(--sky)}
+.tab-pane{display:none}.tab-pane.active{display:block}
+
+/* UTIL */
+.mt16{margin-top:16px}.mb8{margin-bottom:8px}.mt8{margin-top:8px}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+.small{font-size:.82rem}
+.flex-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <a href="#top" class="nav-logo">mcp-exec <span>· how it works</span></a>
+    <span class="nav-sep">|</span>
+    <a href="#top" class="nav-link">Hero</a>
+    <a href="#arch" class="nav-link">Architecture</a>
+    <a href="#tools" class="nav-link">tools()</a>
+    <a href="#exec-node" class="nav-link">exec Node</a>
+    <a href="#exec-python" class="nav-link">exec Python</a>
+    <a href="#exec-bash" class="nav-link">exec Bash</a>
+    <a href="#sessions" class="nav-link">Sessions</a>
+    <a href="#sandbox" class="nav-link">Sandbox</a>
+    <a href="#convo" class="nav-link">Conversation</a>
+    <a href="#fanout" class="nav-link">Benchmarks</a>
+    <a href="#hooks" class="nav-link">Hook Compat</a>
+    <a href="#install" class="nav-link">Install</a>
+  </div>
+</nav>
+
+<!-- PROPERTY PANEL -->
+<div id="prop-overlay"></div>
+<div id="prop-panel">
+  <div class="pp-hdr">
+    <span id="pp-badge" class="pp-badge"></span>
+    <button class="pp-close" id="pp-close">✕</button>
+  </div>
+  <div class="pp-body">
+    <div id="pp-uri" class="pp-uri"></div>
+    <table class="pp-table" id="pp-table"></table>
+  </div>
+</div>
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <div class="container">
+    <div class="hero-badge">🔒 sandbox · context-efficient · MCP-native</div>
+    <h1>Your MCP tools.<br>Zero context bloat.</h1>
+    <p class="hero-sub">mcp-exec proxies all downstream MCP servers through a sandboxed execution layer. Only the final result enters the context window — intermediate data never does.</p>
+
+    <div class="why-grid">
+      <div class="why-card problem">
+        <h3>The Problem</h3>
+        <p>Every connected MCP server dumps its full JSON schema into Claude's context at startup. A 7-server setup — Slack, GitHub, Gmail, Calendar, Linear, Salesforce, Notion — costs <strong>143,000 tokens</strong> before you've said a word. Tool call results add another 10–40k per round trip.</p>
+      </div>
+      <div class="why-card solution">
+        <h3>The Solution</h3>
+        <p><code>tools()</code> returns 100-token summaries instead of full schemas. <code>exec()</code> runs multi-tool MCP workflows inside an OS-level sandbox — the code runs, tools get called, data gets processed, and only the shaped result returns to Claude.</p>
+      </div>
+      <div class="why-card payoff">
+        <h3>The Payoff</h3>
+        <p>43,800 tokens becomes 90 tokens. Not a compression trick — intermediate data <em>never enters context at all</em>. Multi-step workflows that would overflow a 200k window now fit in a paragraph. Schema bloat disappears.</p>
+      </div>
+    </div>
+
+    <div class="ctx-compare">
+      <div class="ctx-card">
+        <h3>Without mcp-exec</h3>
+        <div class="ctx-row">
+          <span class="ctx-lbl">schemas</span>
+          <div class="ctx-bg"><div class="ctx-bar" style="width:100%;background:var(--red)"></div></div>
+          <span class="ctx-val" style="color:var(--red)">143,200 tok</span>
+        </div>
+        <div class="ctx-row">
+          <span class="ctx-lbl">tool results</span>
+          <div class="ctx-bg"><div class="ctx-bar" style="width:85%;background:var(--red)"></div></div>
+          <span class="ctx-val" style="color:var(--red)">38,600 tok</span>
+        </div>
+        <div class="ctx-row">
+          <span class="ctx-lbl">total</span>
+          <div class="ctx-bg"><div class="ctx-bar" style="width:100%;background:#7f1d1d"></div></div>
+          <span class="ctx-val" style="color:var(--red)">181,800 tok</span>
+        </div>
+      </div>
+      <div class="ctx-card">
+        <h3>With mcp-exec</h3>
+        <div class="ctx-row">
+          <span class="ctx-lbl">schemas</span>
+          <div class="ctx-bg"><div class="ctx-bar" style="width:0.3%;background:var(--green)"></div></div>
+          <span class="ctx-val" style="color:var(--green)">520 tok</span>
+        </div>
+        <div class="ctx-row">
+          <span class="ctx-lbl">summaries</span>
+          <div class="ctx-bg"><div class="ctx-bar" style="width:0.8%;background:var(--green)"></div></div>
+          <span class="ctx-val" style="color:var(--green)">180 tok</span>
+        </div>
+        <div class="ctx-row">
+          <span class="ctx-lbl">exec result</span>
+          <div class="ctx-bg"><div class="ctx-bar" style="width:0.5%;background:var(--green)"></div></div>
+          <span class="ctx-val" style="color:var(--green)">90 tok</span>
+        </div>
+        <div class="savings"><span>▼</span><b>99.6%</b> fewer tokens consumed</div>
+      </div>
+    </div>
+
+    <div class="install-snippet">
+      <span class="cmt"># Install as a Claude Code plugin</span><br>
+      <span class="cmd">/plugin install mcp-exec@joeblackwaslike</span><br>
+      <span class="cmt"># Prime the skill loader</span><br>
+      <span class="cmd">/mcp-exec-prime-skill</span>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section class="section" id="arch">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">⬡</div>
+      <h2>Architecture Overview</h2>
+    </div>
+    <p class="sect-sub">All 14 entity types in the mcp-exec system — from Claude's tool calls to the OS-level sandbox wrapping every execution. Click any node to inspect its properties.</p>
+
+    <div class="graph-wrap">
+      <div class="graph-top">
+        <span class="graph-lbl">Property Graph — full system</span>
+        <div class="graph-ctrls">
+          <span class="muted small">Click nodes to inspect</span>
+        </div>
+      </div>
+      <svg id="arch-svg" width="100%" height="520" style="display:block"></svg>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px">
+      <div>
+        <div class="lbl">Node types</div>
+        <div class="legend-grid" id="arch-node-legend"></div>
+      </div>
+      <div>
+        <div class="lbl">Edge types</div>
+        <div class="edge-legend" id="arch-edge-legend"></div>
+      </div>
+    </div>
+
+    <div class="callout mt16">
+      <strong>Startup sequence:</strong> mcp-exec reads <code>.claude/mcp.json</code> → connects all downstream servers via <code>connectMcpClients()</code> → fetches their tool lists with <code>buildCatalog()</code> → registers Node.js loader hooks with the tool catalog → starts the HTTP bridge on <code>127.0.0.1:{random_port}</code> → creates a <code>SessionManager</code> → registers <code>tools</code> and <code>exec</code> with the MCP SDK. From this point, Claude only sees two tools. Everything else is internal.
+    </div>
+
+    <div class="lbl mb8 mt16">Startup sequence — step by step</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num" style="background:#1a3a5c;border-color:#3b4a6b">1</div>
+        <div class="step-body">
+          <h3>Read sandbox config</h3>
+          <p>Merge <code>~/.claude/settings.json</code> and <code>.claude/settings.json</code> sandbox blocks. Map to <code>SandboxRuntimeConfig</code>. Extract MCP server hostnames from <code>.claude/mcp.json</code> and add to <code>allowedDomains</code>. Initialize <code>SandboxManager</code> (srt).</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background:#1a4a4a;border-color:#1e5a3f">2</div>
+        <div class="step-body">
+          <h3>Connect downstream MCP clients</h3>
+          <p>Read <code>.claude/mcp.json</code>, filter out <code>mcp-exec</code> itself. For each remaining server: create <code>Client</code> + <code>StdioClientTransport</code>, call <code>client.connect()</code> via <code>Promise.allSettled</code>. Failed servers go to <code>unavailable[]</code> — they don't crash startup.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background:#2d4a1e;border-color:#3d6b2a">3</div>
+        <div class="step-body">
+          <h3>Build tool catalog</h3>
+          <p>Call <code>client.listTools()</code> on each connected server via <code>Promise.allSettled</code>. For each tool: derive a human-readable signature from <code>inputSchema.properties</code> and the <code>required</code> array. Store as <code>ToolSummary</code>. Servers whose <code>listTools()</code> fails join <code>unavailable[]</code>.</p>
+          <div class="cb" style="margin-top:8px"><span class="c">// deriveSignature output for github/listPullRequests:</span>
+<span class="s">"listPullRequests(owner: string, repo: string, state?: string, per_page?: number): unknown"</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background:#1a3d4a;border-color:#3d1a4a">4</div>
+        <div class="step-body">
+          <h3>Register Node.js loader hooks</h3>
+          <p>Call <code>module.register('./loader/hooks.js', { data: { toolsByServer, unavailableServers } })</code>. The loader hooks worker initializes with the catalog. From this point, any <code>import('mcp/server-name')</code> in sandboxed Node code is intercepted and returns a generated shim module — no disk I/O, no real package resolution.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background:#3d1a4a;border-color:#4a1a4a">5</div>
+        <div class="step-body">
+          <h3>Start HTTP bridge</h3>
+          <p>Create <code>BridgeServer</code> with all MCP clients. Call <code>bridge.start()</code> — binds to <code>127.0.0.1:0</code> (OS assigns port). The port is then injected into every generated Python MCP package as <code>_BRIDGE = "http://127.0.0.1:{port}/call"</code>.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num" style="background:#1e5a3f;border-color:#4ade80">6</div>
+        <div class="step-body">
+          <h3>Register tools with MCP SDK and go live</h3>
+          <p>Create <code>SessionManager</code>. Create exec dispatcher via <code>createExecDispatcher(sessions, clients, bridge, toolsByServer)</code>. Register <code>tools</code> and <code>exec</code> tool handlers on the MCP <code>Server</code>. Connect via <code>StdioServerTransport</code>. Claude Code can now call the two tools.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col mt16">
+      <div>
+        <div class="lbl mb8">Catalog search algorithm</div>
+        <div class="cb"><span class="c">// searchTools("create issue linear")</span>
+<span class="c">// Step 1: tokenize, drop stop words</span>
+tokens = [<span class="s">'create'</span>, <span class="s">'issue'</span>, <span class="s">'linear'</span>]
+
+<span class="c">// Step 2: for each tool, build search text:</span>
+<span class="c">//   description.toLowerCase() + camelCase-split(name)</span>
+toolText = <span class="s">"create a new issue in a linear team create issue"</span>
+
+<span class="c">// Step 3: every token must appear in toolText</span>
+<span class="k">return</span> catalog.<span class="f">filter</span>(tool =>
+  tokens.<span class="f">every</span>(t => <span class="f">toolText</span>(tool).<span class="f">includes</span>(t))
+);</div>
+        <div class="callout mt8">
+          <strong>camelCaseTokens:</strong> <code>"listPullRequests"</code> splits to <code>["list", "pull", "requests"]</code>. So <code>tools("pull")</code> matches it even without the exact name. Stop words (<code>a, an, the, and, or, in, to, of, for, with</code>) are filtered before matching.
+        </div>
+      </div>
+      <div>
+        <div class="lbl mb8">UnavailableServer handling</div>
+        <div class="cb"><span class="c">// tools("*") output when a server failed to connect:</span>
+[
+  {
+    <span class="s">"server"</span>: <span class="s">"github"</span>,
+    <span class="s">"name"</span>: <span class="s">"listPullRequests"</span>,
+    <span class="s">"description"</span>: <span class="s">"..."</span>,
+    <span class="s">"signature"</span>: <span class="s">"..."</span>
+  },
+  <span class="c">// ... other working tools ...</span>
+  {
+    <span class="s">"server"</span>: <span class="s">"notion"</span>,
+    <span class="s">"status"</span>: <span class="s">"unavailable"</span>,
+    <span class="s">"reason"</span>: <span class="s">"not configured in mcp.json"</span>
+  }
+]</div>
+        <div class="callout mt8">
+          <strong>Partial availability:</strong> A single unavailable server never crashes mcp-exec. <code>Promise.allSettled</code> is used at every async boundary — connection, tool listing, and exec dispatch all handle partial failures independently.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TOOLS FLOW -->
+<section class="section" id="tools">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">⊞</div>
+      <h2>tools(query) — Catalog Search</h2>
+    </div>
+    <p class="sect-sub">Claude calls <code>tools("pull requests")</code> and gets back trimmed summaries — never full JSON schemas. The catalog is built once at startup from all connected servers' <code>listTools()</code> responses. Search is substring-AND over name + description tokens.</p>
+
+    <div class="ba">
+      <div class="ba-panel">
+        <div class="ba-hdr before">Without mcp-exec <span class="tok hi">~40,000 tokens</span></div>
+        <div class="ba-body">
+          <div class="lbl">What Claude receives</div>
+          <div class="ob raw">{"name":"listPullRequests","description":"List pull requests for a repository. Returns full PR objects including body, diff_url, patch_url, links, labels, assignees, requested_reviewers, milestone, head, base, _links, node_id, author_association...","inputSchema":{"type":"object","properties":{"owner":{"type":"string","description":"Repository owner (user or org)"},"repo":{"type":"string","description":"Repository name"},"state":{"type":"string","enum":["open","closed","all"],"default":"open"},"head":{"type":"string"},"base":{"type":"string"},"sort":{"type":"string","enum":["created","updated","popularity","long-running"]},"direction":{"type":"string","enum":["asc","desc"]},"per_page":{"type":"number","maximum":100},"page":{"type":"number"}}}}
+            <div class="ob-fade"></div>
+          </div>
+          <div class="savings" style="background:rgba(248,113,113,.07);border-color:rgba(248,113,113,.2);color:var(--red)">Full schemas for 7 servers × avg 18 tools × ~320 tok/schema</div>
+        </div>
+      </div>
+      <div class="ba-panel">
+        <div class="ba-hdr after">With mcp-exec <span class="tok lo">~180 tokens</span></div>
+        <div class="ba-body">
+          <div class="lbl">What Claude receives</div>
+          <div class="ob compact">[{"server":"github","name":"listPullRequests","description":"List pull requests for a GitHub repository.","signature":"listPullRequests(owner: string, repo: string, state?: string, per_page?: number): unknown"},{"server":"linear","name":"listIssues","description":"List issues from a Linear team.","signature":"listIssues(teamId: string, state?: string): unknown"}]
+            <div class="ob-fade"></div>
+          </div>
+          <div class="savings">▼ <b>99.6%</b> reduction — summaries only, no schema payload</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="graph-wrap">
+      <div class="graph-top">
+        <span class="graph-lbl">tools("pull requests") flow</span>
+        <div class="graph-ctrls">
+          <button class="btn btn-play" id="tools-play">▶ Play</button>
+          <button class="btn btn-reset" id="tools-reset">↺ Reset</button>
+        </div>
+      </div>
+      <svg id="tools-svg" width="100%" height="340" style="display:block"></svg>
+    </div>
+
+    <div class="callout green">
+      <strong>Token math:</strong> Each ToolSummary is ~80–120 tokens. A search returning 5 matches = ~500 tokens. Compare to the schema for a single tool (Salesforce <code>search</code>) at ~620 tokens. The catalog itself lives in the mcp-exec process memory — zero context cost for discovery.
+    </div>
+  </div>
+</section>
+
+<!-- EXEC NODE -->
+<section class="section" id="exec-node">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">Ⓝ</div>
+      <h2>exec() — Node Runtime</h2>
+    </div>
+    <p class="sect-sub">Node code runs in a persistent <code>vm.Context</code> (session). MCP imports like <code>import('mcp/github')</code> are intercepted by Node.js loader hooks, which return generated shim modules. The shim calls the real MCP client via <code>globalThis.__mcpClients</code>. The IIFE return value becomes <code>ExecResult.result</code>.</p>
+
+    <div class="ba">
+      <div class="ba-panel">
+        <div class="ba-hdr before">What Claude sends <span class="tok hi">~120 tokens</span></div>
+        <div class="ba-body">
+          <div class="lbl">exec() call</div>
+          <div class="cb"><span class="k">const</span> <span class="n">{ listPullRequests }</span> = <span class="k">await</span> <span class="f">import</span>(<span class="s">'mcp/github'</span>);
+<span class="k">const</span> <span class="n">{ listIssues }</span> = <span class="k">await</span> <span class="f">import</span>(<span class="s">'mcp/linear'</span>);
+
+<span class="k">const</span> [prs, issues] = <span class="k">await</span> Promise.all([
+  <span class="f">listPullRequests</span>({ owner: <span class="s">'acme'</span>, repo: <span class="s">'api'</span>, state: <span class="s">'open'</span> }),
+  <span class="f">listIssues</span>({ teamId: <span class="s">'ENG'</span>, state: <span class="s">'started'</span> }),
+]);
+
+<span class="k">return</span> {
+  openPRs: prs.<span class="f">length</span>,
+  blockedIssues: issues.<span class="f">filter</span>(i => i.priority === <span class="n">1</span>).<span class="f">length</span>,
+  staleReviews: prs.<span class="f">filter</span>(p => p.draft === <span class="k">false</span> && p.requested_reviewers.<span class="f">length</span> > <span class="n">0</span>)
+                   .<span class="f">map</span>(p => ({ title: p.title, url: p.html_url })),
+};</div>
+        </div>
+      </div>
+      <div class="ba-panel">
+        <div class="ba-hdr after">What Claude receives <span class="tok lo">~60 tokens</span></div>
+        <div class="ba-body">
+          <div class="lbl">ExecResult</div>
+          <div class="ob compact">{"result":{"openPRs":7,"blockedIssues":2,"staleReviews":[{"title":"feat: add rate limiting","url":"https://github.com/acme/api/pull/142"},{"title":"fix: auth token refresh","url":"https://github.com/acme/api/pull/138"}]},"tool_calls":[{"server":"github","tool":"listPullRequests","duration_ms":312},{"server":"linear","tool":"listIssues","duration_ms":187}]}
+            <div class="ob-fade"></div>
+          </div>
+          <div class="savings">▼ <b>95%+</b> reduction — raw PR/issue data never entered context</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="graph-wrap">
+      <div class="graph-top">
+        <span class="graph-lbl">exec() Node flow — vm.Context + loader hooks</span>
+        <div class="graph-ctrls">
+          <button class="btn btn-play" id="node-play">▶ Play</button>
+          <button class="btn btn-reset" id="node-reset">↺ Reset</button>
+        </div>
+      </div>
+      <svg id="node-svg" width="100%" height="380" style="display:block"></svg>
+    </div>
+
+    <div class="two-col mt16">
+      <div>
+        <div class="lbl mb8">Generated shim (mcp/github virtual module)</div>
+        <div class="cb"><span class="c">// Loader hook generates this at import time</span>
+<span class="c">// specifier: 'mcp/github' → url: 'virtual:mcp/github'</span>
+<span class="k">export async function</span> <span class="f">listPullRequests</span>(params) {
+  <span class="k">return</span> globalThis.__mcpClients[<span class="s">'github'</span>]
+           .<span class="f">callTool</span>(<span class="s">'listPullRequests'</span>, params);
+}
+<span class="k">export async function</span> <span class="f">createPullRequest</span>(params) {
+  <span class="k">return</span> globalThis.__mcpClients[<span class="s">'github'</span>]
+           .<span class="f">callTool</span>(<span class="s">'createPullRequest'</span>, params);
+}
+<span class="c">// ... one export per tool in the catalog</span></div>
+      </div>
+      <div>
+        <div class="lbl mb8">Session persistence</div>
+        <div class="callout">
+          <strong>Implicit session:</strong> Each conversation shares one <code>vm.Context</code> identified as <code>__implicit__</code>. Variables and functions defined in one <code>exec()</code> call persist to the next.
+        </div>
+        <div class="callout">
+          <strong>Explicit session:</strong> Pass <code>session_id: "my-parallel-task"</code> to isolate parallel workflows. Each session has its own <code>vm.Context</code> and <code>__mcpClients</code> binding.
+        </div>
+        <div class="callout warn">
+          <strong>Stateless note:</strong> Bash and Python runtimes are always stateless — each call is a fresh subprocess. Only the Node runtime maintains session state.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EXEC PYTHON -->
+<section class="section" id="exec-python">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">Ⓟ</div>
+      <h2>exec() — Python Runtime</h2>
+    </div>
+    <p class="sect-sub">Python code runs in a fresh <code>uv run --isolated</code> subprocess per call — no session state. MCP server access works via a generated <code>mcp/</code> Python package written to <code>/tmp</code>. Each function in that package POSTs to the HTTP bridge, which proxies to the real MCP SDK clients. Stdout is the result.</p>
+
+    <div class="ba">
+      <div class="ba-panel">
+        <div class="ba-hdr before">Python with pandas + MCP imports</div>
+        <div class="ba-body">
+          <div class="lbl">exec() call</div>
+          <div class="cb"><span class="c"># /// script</span>
+<span class="c"># requires-python = ">=3.11"</span>
+<span class="c"># dependencies = ["pandas>=2.0", "tabulate"]</span>
+<span class="c"># ///</span>
+<span class="k">import</span> pandas <span class="k">as</span> pd
+<span class="k">from</span> mcp.salesforce <span class="k">import</span> search
+<span class="k">from</span> mcp.gmail <span class="k">import</span> list_messages
+
+leads = search(q=<span class="s">"open opportunities"</span>, object_type=<span class="s">"Opportunity"</span>)
+df = pd.DataFrame(leads)
+top = df.nlargest(<span class="n">5</span>, <span class="s">"Amount"</span>)[[<span class="s">"Name"</span>, <span class="s">"Amount"</span>, <span class="s">"StageName"</span>]]
+<span class="f">print</span>(top.<span class="f">to_json</span>(orient=<span class="s">"records"</span>))</div>
+        </div>
+      </div>
+      <div class="ba-panel">
+        <div class="ba-hdr after">What Claude receives <span class="tok lo">~80 tokens</span></div>
+        <div class="ba-body">
+          <div class="lbl">stdout → result</div>
+          <div class="ob compact">[{"Name":"Acme Corp Enterprise","Amount":245000,"StageName":"Negotiation"},{"Name":"TechCo Platform Deal","Amount":188000,"StageName":"Proposal"},{"Name":"Retail Chain SSO","Amount":92000,"StageName":"Qualification"},{"Name":"Finance Ltd API","Amount":67500,"StageName":"Negotiation"},{"Name":"Startup Seed","Amount":12000,"StageName":"Closed Won"}]
+            <div class="ob-fade"></div>
+          </div>
+          <div class="savings">▼ <b>97%</b> — pandas, 340 raw CRM records, all stayed in the sandbox</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="graph-wrap">
+      <div class="graph-top">
+        <span class="graph-lbl">exec() Python flow — uv + HTTP bridge</span>
+        <div class="graph-ctrls">
+          <button class="btn btn-play" id="python-play">▶ Play</button>
+          <button class="btn btn-reset" id="python-reset">↺ Reset</button>
+        </div>
+      </div>
+      <svg id="python-svg" width="100%" height="340" style="display:block"></svg>
+    </div>
+
+    <div class="two-col mt16">
+      <div>
+        <div class="lbl mb8">Generated mcp/salesforce.py</div>
+        <div class="cb"><span class="k">import</span> json, urllib.request <span class="k">as</span> _req
+
+_BRIDGE = <span class="s">"http://127.0.0.1:49821/call"</span>
+_EXEC_ID = <span class="s">"a1b2c3d4-..."</span>
+_SERVER = <span class="s">"salesforce"</span>
+
+<span class="k">def</span> <span class="f">_call</span>(tool, **kwargs):
+    data = json.dumps({
+      <span class="s">"server"</span>: _SERVER, <span class="s">"tool"</span>: tool,
+      <span class="s">"args"</span>: kwargs, <span class="s">"execId"</span>: _EXEC_ID
+    }).encode()
+    <span class="k">with</span> _req.<span class="f">urlopen</span>(...) <span class="k">as</span> r:
+        body = json.<span class="f">loads</span>(r.<span class="f">read</span>())
+    <span class="k">if</span> <span class="s">"error"</span> <span class="k">in</span> body: <span class="k">raise</span> RuntimeError(body[<span class="s">"error"</span>])
+    <span class="k">return</span> body[<span class="s">"result"</span>]
+
+<span class="k">def</span> <span class="f">search</span>(**kwargs):
+    <span class="k">return</span> <span class="f">_call</span>(<span class="s">"search"</span>, **kwargs)
+<span class="k">def</span> <span class="f">get_record</span>(**kwargs):
+    <span class="k">return</span> <span class="f">_call</span>(<span class="s">"getRecord"</span>, **kwargs)</div>
+      </div>
+      <div>
+        <div class="lbl mb8">Key design decisions</div>
+        <div class="callout">
+          <strong>PEP 723 inline deps:</strong> The <code># /// script</code> block at the top of Python code declares dependencies inline. <code>uv run --isolated</code> reads this and installs into a fresh venv before running. No global packages required.
+        </div>
+        <div class="callout">
+          <strong>Fresh process per call:</strong> Unlike Node, there is no Python session. Each <code>exec()</code> call spawns a new <code>uv</code> process, writes a tmp file, runs it, and cleans up. This means you cannot share variables between Python exec calls.
+        </div>
+        <div class="callout">
+          <strong>Bridge lifecycle:</strong> The HTTP bridge listens on a random loopback port decided at server startup. The port is injected into each generated package as <code>_BRIDGE</code>. The bridge flushes its <code>tool_calls</code> log per <code>execId</code> after the subprocess exits.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EXEC BASH -->
+<section class="section" id="exec-bash">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">$</div>
+      <h2>exec() — Bash Runtime</h2>
+    </div>
+    <p class="sect-sub">The simplest runtime. Bash code runs in a stateless subprocess via <code>spawn('bash', ['-c', code])</code>. No session, no MCP imports — stdout is the result. Best for shell pipelines, file operations, and chaining with data from a previous Node exec.</p>
+
+    <div class="ba">
+      <div class="ba-panel">
+        <div class="ba-hdr before">Bash pipeline scenario</div>
+        <div class="ba-body">
+          <div class="lbl">exec() call (runtime: "bash")</div>
+          <div class="cb"><span class="c"># Process a CSV written by a previous Node exec</span>
+<span class="c"># Count error lines grouped by status code</span>
+awk <span class="s">-F, 'NR>1 {count[$3]++} END {for (c in count) print c, count[c]}'</span> \
+  /tmp/api-logs-export.csv \
+  | sort -k2 -rn \
+  | head -10</div>
+        </div>
+      </div>
+      <div class="ba-panel">
+        <div class="ba-hdr after">What Claude receives <span class="tok lo">~20 tokens</span></div>
+        <div class="ba-body">
+          <div class="lbl">stdout → result</div>
+          <div class="ob compact" style="max-height:none">500 24312
+401 8943
+503 1204
+429 876
+502 312
+404 88
+400 41
+408 17
+504 9
+422 3
+            </div>
+          <div class="savings">▼ 24k log lines processed, only 10 rows returned</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="graph-wrap">
+      <div class="graph-top">
+        <span class="graph-lbl">exec() Bash flow — stateless subprocess</span>
+        <div class="graph-ctrls">
+          <button class="btn btn-play" id="bash-play">▶ Play</button>
+          <button class="btn btn-reset" id="bash-reset">↺ Reset</button>
+        </div>
+      </div>
+      <svg id="bash-svg" width="100%" height="260" style="display:block"></svg>
+    </div>
+
+    <div class="two-col mt16">
+      <div>
+        <div class="callout">
+          <strong>Env filtering:</strong> By default, only a safe allowlist (<code>PATH</code>, <code>HOME</code>, <code>TMPDIR</code>, <code>LANG</code>, etc.) is passed to the subprocess. Add variables via <code>sandbox.env.allow</code> in <code>settings.json</code>, or pass them per-call via <code>runtime: {type: "bash", env: {MY_VAR: "val"}}</code>.
+        </div>
+        <div class="callout">
+          <strong>Timeout handling:</strong> Send <code>SIGTERM</code> on timeout. If the process doesn't exit within 2s, escalate to <code>SIGKILL</code>. Exit code <code>124</code> signals a timeout (matches the GNU timeout convention).
+        </div>
+      </div>
+      <div>
+        <div class="lbl mb8">Cross-runtime data threading</div>
+        <div class="cb"><span class="c">// Step 1: Node fetches + exports data</span>
+<span class="k">const</span> { query } = <span class="k">await</span> <span class="f">import</span>(<span class="s">'mcp/database'</span>);
+<span class="k">const</span> rows = <span class="k">await</span> <span class="f">query</span>({});
+<span class="c">// Write to /tmp for Bash to read</span>
+<span class="k">const</span> fs = <span class="k">await</span> <span class="f">import</span>(<span class="s">'node:fs/promises'</span>);
+<span class="k">await</span> fs.<span class="f">writeFile</span>(<span class="s">'/tmp/rows.csv'</span>, toCsv(rows));
+<span class="k">return</span> <span class="s">'/tmp/rows.csv written'</span>;
+
+<span class="c">// Step 2: Bash processes it</span>
+<span class="c">// runtime: "bash"</span>
+<span class="c">// code: "awk '...' /tmp/rows.csv | sort | head -10"</span></div>
+        <p class="muted small mt8">Use <code>ExecResult.stdout</code> to thread raw data between runtimes. The agent writes it explicitly — no automatic piping.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SESSIONS -->
+<section class="section" id="sessions">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">◎</div>
+      <h2>Session Model</h2>
+    </div>
+    <p class="sect-sub">Sessions are Node.js <code>vm.Context</code> objects managed by <code>SessionManager</code>. They persist JavaScript state between exec() calls within a conversation. Max 100 concurrent sessions; 10-minute idle timeout.</p>
+
+    <div class="two-col">
+      <div>
+        <div class="lbl mb8">Session lifecycle</div>
+        <div id="session-states"></div>
+        <div class="graph-ctrls mt16" style="justify-content:flex-start">
+          <button class="btn btn-play" id="session-play">▶ Animate lifecycle</button>
+          <button class="btn btn-reset" id="session-reset">↺ Reset</button>
+        </div>
+        <div id="session-desc" class="state-desc mt16">Click Play to animate the session lifecycle.</div>
+      </div>
+      <div>
+        <div class="lbl mb8">Session globals injected at creation</div>
+        <div class="cb"><span class="c">// vm.createContext() receives:</span>
+{
+  <span class="c">// Safe Node.js globals</span>
+  Buffer, URL, URLSearchParams,
+  TextEncoder, TextDecoder,
+  structuredClone, queueMicrotask,
+  atob, btoa, AbortController,
+  setTimeout, clearTimeout,
+  setInterval, clearInterval,
+  setImmediate, clearImmediate,
+
+  <span class="c">// mcp-exec internals</span>
+  __mcpClients: {
+    github: { callTool: (name, params) => ... },
+    slack:  { callTool: (name, params) => ... },
+    <span class="c">// ... one per connected server</span>
+  },
+  __session_id: <span class="s">"__implicit__"</span>,
+}
+
+<span class="c">// Deliberately excluded:</span>
+<span class="c">// process, require, __dirname, __filename</span></div>
+        <div class="callout warn mt16">
+          <strong>Shim bridging:</strong> Because loader hooks run in the main context (<code>globalThis</code>), not the <code>vm.Context</code>, the Node runtime temporarily copies <code>__mcpClients</code> onto <code>globalThis</code> for the duration of each exec call, then restores the previous value. This bridges the two execution contexts.
+        </div>
+      </div>
+    </div>
+
+    <div class="graph-wrap mt16">
+      <div class="graph-top">
+        <span class="graph-lbl">Session manager — state transitions</span>
+      </div>
+      <svg id="session-svg" width="100%" height="200" style="display:block"></svg>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="lbl mb8">Implicit vs explicit sessions</div>
+      <div class="ba">
+        <div class="ba-panel">
+          <div class="ba-hdr" style="color:var(--sky)">Implicit (default)</div>
+          <div class="ba-body">
+            <div class="cb"><span class="c">// No session_id — uses "__implicit__"</span>
+<span class="c">// All calls in this conversation share one vm.Context</span>
+<span class="k">await</span> <span class="f">exec</span>({ code: <span class="s">'globalThis.x = 42'</span>, runtime: <span class="s">'node'</span> });
+<span class="k">await</span> <span class="f">exec</span>({ code: <span class="s">'return globalThis.x'</span>, runtime: <span class="s">'node'</span> });
+<span class="c">// → 42   ✓ state persists</span></div>
+          </div>
+        </div>
+        <div class="ba-panel">
+          <div class="ba-hdr" style="color:var(--purple)">Explicit (parallel isolation)</div>
+          <div class="ba-body">
+            <div class="cb"><span class="c">// Parallel agents don't share state</span>
+<span class="k">await</span> Promise.all([
+  <span class="f">exec</span>({ code: <span class="s">'return fetchGithubMetrics()'</span>,
+         runtime: <span class="s">'node'</span>, session_id: <span class="s">'agent-a'</span> }),
+  <span class="f">exec</span>({ code: <span class="s">'return fetchSlackDMs()'</span>,
+         runtime: <span class="s">'node'</span>, session_id: <span class="s">'agent-b'</span> }),
+]);</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SANDBOX -->
+<section class="section" id="sandbox">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">🔒</div>
+      <h2>Sandbox Layering</h2>
+    </div>
+    <p class="sect-sub">The OS-level sandbox wraps the entire mcp-exec process. <code>vm.Context</code> adds a second layer for Node code. Codex's platform sandbox (macOS <code>sandbox-exec</code> / Linux <code>bwrap</code>) adds an outer layer on top of all of it.</p>
+
+    <div class="graph-wrap">
+      <div class="graph-top">
+        <span class="graph-lbl">Sandbox layers — swimlane view</span>
+      </div>
+      <svg id="sandbox-svg" width="100%" height="340" style="display:block"></svg>
+    </div>
+
+    <div class="two-col mt16">
+      <div>
+        <div class="lbl mb8">Sandbox config (settings.json)</div>
+        <div class="cb">{
+  <span class="s">"sandbox"</span>: {
+    <span class="s">"network"</span>: {
+      <span class="s">"allowedDomains"</span>: [
+        <span class="s">"api.github.com"</span>,
+        <span class="s">"slack.com"</span>,
+        <span class="s">"gmail.googleapis.com"</span>
+      ]
+    },
+    <span class="s">"filesystem"</span>: {
+      <span class="s">"allowWrite"</span>: [<span class="s">"/tmp"</span>, <span class="s">"~/.mcp-exec/sessions"</span>],
+      <span class="s">"denyRead"</span>: [<span class="s">"~/.ssh"</span>, <span class="s">"~/.gnupg"</span>]
+    },
+    <span class="s">"env"</span>: {
+      <span class="s">"allow"</span>: [<span class="s">"GITHUB_TOKEN"</span>, <span class="s">"SLACK_TOKEN"</span>]
+    }
+  }
+}</div>
+        <p class="muted small mt8">User settings (<code>~/.claude/settings.json</code>) and project settings (<code>.claude/settings.json</code>) are merged — arrays union, no overwrite.</p>
+      </div>
+      <div>
+        <div class="lbl mb8">What each layer enforces</div>
+        <table class="ref-table">
+          <tr><th>Layer</th><th>Enforces</th></tr>
+          <tr><td>srt (outer)</td><td>Network domains, filesystem read/write, env var allowlist — OS-level, cannot be bypassed by code inside</td></tr>
+          <tr><td>vm.Context</td><td>No <code>process</code>, no <code>require</code>, no <code>__dirname</code> — protects the host Node.js process from untrusted code</td></tr>
+          <tr><td>Codex platform</td><td>macOS <code>sandbox-exec</code> / Linux <code>bwrap</code> wraps the Claude Code process itself — adds a third outer ring</td></tr>
+          <tr><td>filterEnv()</td><td>Subprocess env is filtered to the <code>env.allow</code> list before spawning bash or uv — secrets not in the allowlist can't leak into subprocesses</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FAN-OUT BENCHMARK -->
+<section class="section" id="fanout">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">⚡</div>
+      <h2>Fan-Out Benchmark — Real Token Numbers</h2>
+    </div>
+    <p class="sect-sub">The benchmark suite in <code>src/benchmarks/</code> measures actual byte savings on realistic MCP workflows. These numbers come from the test harness using mock clients that return production-shaped payloads.</p>
+
+    <div class="ba">
+      <div class="ba-panel">
+        <div class="ba-hdr before">Direct tool access — baseline</div>
+        <div class="ba-body">
+          <div class="lbl">Schema cost at startup (Claude loads these for every conversation)</div>
+          <div class="ctx-card" style="margin-bottom:10px">
+            <div class="ctx-row"><span class="ctx-lbl">salesforce</span><div class="ctx-bg"><div class="ctx-bar" style="width:100%;background:var(--red)"></div></div><span class="ctx-val" style="color:var(--red)">~8,400 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">gmail</span><div class="ctx-bg"><div class="ctx-bar" style="width:60%;background:var(--red)"></div></div><span class="ctx-val" style="color:var(--red)">~5,100 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">calendar</span><div class="ctx-bg"><div class="ctx-bar" style="width:55%;background:var(--red)"></div></div><span class="ctx-val" style="color:var(--red)">~4,800 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">slack</span><div class="ctx-bg"><div class="ctx-bar" style="width:50%;background:var(--red)"></div></div><span class="ctx-val" style="color:var(--red)">~4,200 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">github</span><div class="ctx-bg"><div class="ctx-bar" style="width:85%;background:var(--red)"></div></div><span class="ctx-val" style="color:var(--red)">~7,100 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">linear</span><div class="ctx-bg"><div class="ctx-bar" style="width:45%;background:var(--red)"></div></div><span class="ctx-val" style="color:var(--red)">~3,800 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">notion</span><div class="ctx-bg"><div class="ctx-bar" style="width:48%;background:var(--red)"></div></div><span class="ctx-val" style="color:var(--red)">~4,000 tok</span></div>
+          </div>
+          <div class="lbl">Data cost per workflow (one round of 4 parallel tool calls)</div>
+          <div class="ctx-card">
+            <div class="ctx-row"><span class="ctx-lbl">email list</span><div class="ctx-bg"><div class="ctx-bar" style="width:100%;background:var(--orange)"></div></div><span class="ctx-val" style="color:var(--orange)">~14,200 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">calendar</span><div class="ctx-bg"><div class="ctx-bar" style="width:60%;background:var(--orange)"></div></div><span class="ctx-val" style="color:var(--orange)">~8,400 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">slack msgs</span><div class="ctx-bg"><div class="ctx-bar" style="width:50%;background:var(--orange)"></div></div><span class="ctx-val" style="color:var(--orange)">~7,000 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">CRM leads</span><div class="ctx-bg"><div class="ctx-bar" style="width:85%;background:var(--orange)"></div></div><span class="ctx-val" style="color:var(--orange)">~11,900 tok</span></div>
+          </div>
+          <div class="savings" style="background:rgba(248,113,113,.07);border-color:rgba(248,113,113,.2);color:var(--red)">Total: <b>~79,000 tokens</b> consumed before Claude can answer</div>
+        </div>
+      </div>
+      <div class="ba-panel">
+        <div class="ba-hdr after">With mcp-exec — actual benchmark result</div>
+        <div class="ba-body">
+          <div class="lbl">mcp-exec schema (all 7 servers proxied, only 2 tools exposed)</div>
+          <div class="ctx-card" style="margin-bottom:10px">
+            <div class="ctx-row"><span class="ctx-lbl">exec schema</span><div class="ctx-bg"><div class="ctx-bar" style="width:1%;background:var(--green)"></div></div><span class="ctx-val" style="color:var(--green)">~360 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">tools schema</span><div class="ctx-bg"><div class="ctx-bar" style="width:0.8%;background:var(--green)"></div></div><span class="ctx-val" style="color:var(--green)">~160 tok</span></div>
+          </div>
+          <div class="lbl">Fan-out workflow result (4 servers queried in parallel, shaped output)</div>
+          <div class="ctx-card">
+            <div class="ctx-row"><span class="ctx-lbl">tools() query</span><div class="ctx-bg"><div class="ctx-bar" style="width:0.4%;background:var(--green)"></div></div><span class="ctx-val" style="color:var(--green)">~180 tok</span></div>
+            <div class="ctx-row"><span class="ctx-lbl">exec result</span><div class="ctx-bg"><div class="ctx-bar" style="width:0.2%;background:var(--green)"></div></div><span class="ctx-val" style="color:var(--green)">~90 tok</span></div>
+          </div>
+          <div class="lbl" style="margin-top:10px">The exec() code that powered the fan-out</div>
+          <div class="cb"><span class="k">const</span> { listMessages }  = <span class="k">await</span> <span class="f">import</span>(<span class="s">'mcp/gmail'</span>);
+<span class="k">const</span> { listEvents }    = <span class="k">await</span> <span class="f">import</span>(<span class="s">'mcp/calendar'</span>);
+<span class="k">const</span> { listChannels }  = <span class="k">await</span> <span class="f">import</span>(<span class="s">'mcp/slack'</span>);
+<span class="k">const</span> { search }        = <span class="k">await</span> <span class="f">import</span>(<span class="s">'mcp/salesforce'</span>);
+<span class="k">const</span> [emails, events, msgs, leads] = <span class="k">await</span> Promise.all([
+  <span class="f">listMessages</span>({}),  <span class="f">listEvents</span>({}),
+  <span class="f">listChannels</span>({}),  <span class="f">search</span>({ q: <span class="s">'open deals'</span> }),
+]);
+<span class="k">return</span> {
+  unread: emails.<span class="f">filter</span>(e=>e.labels?.<span class="f">includes</span>(<span class="s">'UNREAD'</span>)).<span class="f">length</span>,
+  nextMeeting: events[<span class="n">0</span>]?.summary ?? <span class="s">'none'</span>,
+  recentActivity: msgs.<span class="f">slice</span>(<span class="n">0</span>,<span class="n">2</span>).<span class="f">map</span>(m=>m.text?.<span class="f">slice</span>(<span class="n">0</span>,<span class="n">50</span>)),
+  hotLeads: leads.<span class="f">filter</span>(l=>l.Rating===<span class="s">'Hot'</span>).<span class="f">slice</span>(<span class="n">0</span>,<span class="n">3</span>).<span class="f">map</span>(l=>l.Name),
+};</div>
+          <div class="savings">Total: <b>~790 tokens</b> — <b>99.0% reduction</b> vs direct-tool baseline</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lbl mb8">All benchmark scenarios — source: src/benchmarks/</div>
+    <table class="ref-table">
+      <tr>
+        <th>Scenario</th>
+        <th>Baseline</th>
+        <th>With mcp-exec</th>
+        <th>Threshold</th>
+        <th>Source</th>
+      </tr>
+      <tr>
+        <td>Full stack (4 servers, schema + data)</td>
+        <td style="color:var(--red);font-family:var(--mono)">~400,000 B</td>
+        <td style="color:var(--green);font-family:var(--mono)">&lt;40,000 B</td>
+        <td><span class="rt-badge rt-yes">&lt;10%</span></td>
+        <td style="font-size:10px;color:var(--dim)">full-stack.bench.ts</td>
+      </tr>
+      <tr>
+        <td>Large result trim (10k rows → 5 filtered rows)</td>
+        <td style="color:var(--red);font-family:var(--mono)">~1.2 MB</td>
+        <td style="color:var(--green);font-family:var(--mono)">&lt;60,000 B</td>
+        <td><span class="rt-badge rt-yes">&lt;5%</span></td>
+        <td style="font-size:10px;color:var(--dim)">trim.bench.ts</td>
+      </tr>
+      <tr>
+        <td>Stateful accumulation (5 calls, one session)</td>
+        <td style="color:var(--red);font-family:var(--mono)">~60,000 B</td>
+        <td style="color:var(--green);font-family:var(--mono)">&lt;3,000 B</td>
+        <td><span class="rt-badge rt-yes">&lt;5%</span></td>
+        <td style="font-size:10px;color:var(--dim)">stateful.bench.ts</td>
+      </tr>
+      <tr>
+        <td>Auth forwarding (GITHUB_TOKEN env var)</td>
+        <td style="color:var(--orange);font-family:var(--mono)">token in env</td>
+        <td style="color:var(--green);font-family:var(--mono)">forwarded to subprocess</td>
+        <td><span class="rt-badge rt-yes">PASS</span></td>
+        <td style="font-size:10px;color:var(--dim)">auth-forwarding.bench.ts</td>
+      </tr>
+      <tr>
+        <td>Error recovery (tool fails → partial result)</td>
+        <td style="color:var(--orange);font-family:var(--mono)">error thrown</td>
+        <td style="color:var(--green);font-family:var(--mono)">error in tool_calls[].error</td>
+        <td><span class="rt-badge rt-yes">PASS</span></td>
+        <td style="font-size:10px;color:var(--dim)">error-recovery.bench.ts</td>
+      </tr>
+      <tr>
+        <td>Salesforce SOQL fan-out (3 object types)</td>
+        <td style="color:var(--red);font-family:var(--mono)">~180,000 B</td>
+        <td style="color:var(--green);font-family:var(--mono)">&lt;9,000 B</td>
+        <td><span class="rt-badge rt-yes">&lt;5%</span></td>
+        <td style="font-size:10px;color:var(--dim)">salesforce.bench.ts</td>
+      </tr>
+    </table>
+
+    <div class="callout mt16">
+      <strong>Run the suite:</strong> <code style="color:var(--green)">npm run bench</code> — outputs byte sizes, ratios, and pass/fail for each scenario. The CI configuration runs benchmarks on every PR and fails if any scenario exceeds its threshold.
+    </div>
+  </div>
+</section>
+
+<!-- HOOK COMPAT -->
+<section class="section" id="hooks">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">↪</div>
+      <h2>Hook Compatibility</h2>
+    </div>
+    <p class="sect-sub">Claude Code hooks fire on tool call events. When <code>exec()</code> runs code that calls downstream MCP tools internally, those calls happen inside the sandbox — Claude Code's hook system never sees them. This is by design: it's why intermediate results don't enter context.</p>
+
+    <div class="graph-wrap">
+      <div class="graph-top">
+        <span class="graph-lbl">What hooks see when exec() is used</span>
+      </div>
+      <svg id="hooks-svg" width="100%" height="300" style="display:block"></svg>
+    </div>
+
+    <div class="mt16">
+      <div class="lbl mb8">Hook reference table</div>
+      <table class="ref-table">
+        <tr>
+          <th>Hook event</th>
+          <th>Fires on exec()?</th>
+          <th>Fires on tools()?</th>
+          <th>Notes</th>
+        </tr>
+        <tr>
+          <td>PreToolUse</td>
+          <td><span class="rt-badge rt-yes">YES</span></td>
+          <td><span class="rt-badge rt-yes">YES</span></td>
+          <td>Fires for the <code>exec</code> or <code>tools</code> call itself. Can deny or modify args.</td>
+        </tr>
+        <tr>
+          <td>PostToolUse</td>
+          <td><span class="rt-badge rt-yes">YES</span></td>
+          <td><span class="rt-badge rt-yes">YES</span></td>
+          <td>Fires after <code>exec</code> or <code>tools</code> returns. Sees <code>ExecResult</code>, not raw data.</td>
+        </tr>
+        <tr>
+          <td>PreToolUse (downstream)</td>
+          <td><span class="rt-badge rt-no">NO</span></td>
+          <td>N/A</td>
+          <td>Downstream calls happen inside the sandbox process. Hook system is in the Claude Code process — different process, no IPC.</td>
+        </tr>
+        <tr>
+          <td>PostToolUse (downstream)</td>
+          <td><span class="rt-badge rt-no">NO</span></td>
+          <td>N/A</td>
+          <td>Same reason. Downstream results never cross the process boundary into Claude Code.</td>
+        </tr>
+        <tr>
+          <td>Notification</td>
+          <td><span class="rt-badge rt-yes">YES</span></td>
+          <td><span class="rt-badge rt-yes">YES</span></td>
+          <td>Fires normally — exec() and tools() are MCP tools like any other from Claude's perspective.</td>
+        </tr>
+        <tr>
+          <td>Stop</td>
+          <td><span class="rt-badge rt-yes">YES</span></td>
+          <td><span class="rt-badge rt-yes">YES</span></td>
+          <td>Not affected by exec() behavior.</td>
+        </tr>
+        <tr>
+          <td>memtree / other MCP hooks</td>
+          <td><span class="rt-badge rt-partial">PARTIAL</span></td>
+          <td><span class="rt-badge rt-yes">YES</span></td>
+          <td>If memtree intercepts tool calls, it sees <code>exec</code> and <code>tools</code> calls but not the downstream calls inside exec(). The ExecResult is recorded, not the intermediate data — which is the point.</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="callout green mt16">
+      <strong>Composability:</strong> mcp-exec works correctly alongside memtree and other hook-based plugins. memtree records the <code>exec()</code> tool call and its compact result — not 40k rows of raw data. This stacks the savings: mcp-exec eliminates intermediate data, memtree compresses the result reference.
+    </div>
+  </div>
+</section>
+
+<!-- CONVERSATION FLOW -->
+<section class="section" id="convo">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">◈</div>
+      <h2>Full Conversation Flow — Force Graph</h2>
+    </div>
+    <p class="sect-sub">A realistic multi-turn conversation: Claude discovers tools, runs a Node fan-out, processes results with Python pandas, and posts a Slack summary. The graph shows all 20+ entity instances involved. Drag nodes, zoom, click to inspect.</p>
+
+    <div class="graph-wrap">
+      <div class="graph-top">
+        <span class="graph-lbl">mcp-exec entity graph — drag + zoom + click</span>
+        <div class="graph-ctrls">
+          <button class="btn btn-fit" id="convo-fit">⊙ Fit</button>
+          <span class="muted small">Drag to reposition · scroll to zoom</span>
+        </div>
+      </div>
+      <svg id="convo-svg" width="100%" height="520" style="display:block"></svg>
+    </div>
+
+    <div class="callout mt16">
+      <strong>What this shows:</strong> Turn 1 → <code>tools("email analytics")</code> → 3 ToolSummary nodes. Turn 2 → <code>exec()</code> Node: imports gmail + salesforce, runs fan-out, returns shaped JSON → ExecResult + 2 ToolCallRecords. Turn 3 → <code>exec()</code> Python: pandas aggregation → ExecResult. Turn 4 → <code>exec()</code> Bash: format + post via curl → ExecResult. All intermediate data (50 emails, 200 CRM records, pandas DataFrames) stayed inside the sandbox — only the shaped summaries returned to Claude.
+    </div>
+  </div>
+</section>
+
+<!-- INSTALL -->
+<section class="section" id="install">
+  <div class="container">
+    <div class="sect-hdr">
+      <div class="sect-icon">⬇</div>
+      <h2>Install</h2>
+    </div>
+    <p class="sect-sub">mcp-exec is a Claude Code plugin. Installing it registers the MCP server and primes the skill loader. No manual MCP config editing required.</p>
+
+    <div class="two-col">
+      <div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <h3>Install the plugin</h3>
+              <p>Requires Claude Code with the marketplace plugin.</p>
+              <div class="cb"><span class="cmd" style="color:var(--green)">/plugin install mcp-exec@joeblackwaslike</span></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <h3>Prime the skill loader</h3>
+              <p>Adds the activation rule to your <code>CLAUDE.md</code> so the model knows when to use <code>tools()</code> and <code>exec()</code>.</p>
+              <div class="cb"><span class="cmd" style="color:var(--green)">/mcp-exec-prime-skill</span></div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <h3>Configure the sandbox</h3>
+              <p>Add a <code>sandbox</code> block to <code>~/.claude/settings.json</code> with the domains your MCP servers need.</p>
+              <div class="cb">{
+  <span class="s">"sandbox"</span>: {
+    <span class="s">"network"</span>: { <span class="s">"allowedDomains"</span>: [<span class="s">"api.github.com"</span>] },
+    <span class="s">"env"</span>: { <span class="s">"allow"</span>: [<span class="s">"GITHUB_TOKEN"</span>] }
+  }
+}</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <h3>Verify connectivity</h3>
+              <p>Ask Claude to list available tools — it will call <code>tools("*")</code> and return summaries from all connected servers.</p>
+              <div class="cb"><span class="c">// Claude will do this automatically:</span>
+<span class="f">tools</span>(<span class="s">"*"</span>)
+<span class="c">// → [{server:"github", name:"listPullRequests", ...}, ...]</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="lbl mb8">Manual install (no marketplace)</div>
+        <div class="cb"><span class="cmt" style="color:var(--dim)"># Via npx directly</span>
+<span class="cmd" style="color:var(--green)">npx @joeblackwaslike2/mcp-exec</span>
+
+<span class="cmt" style="color:var(--dim)"># Or add to .claude/mcp.json manually:</span>
+{
+  <span class="s">"mcpServers"</span>: {
+    <span class="s">"mcp-exec"</span>: {
+      <span class="s">"command"</span>: <span class="s">"npx"</span>,
+      <span class="s">"args"</span>: [<span class="s">"@joeblackwaslike2/mcp-exec"</span>]
+    }
+  }
+}</div>
+
+        <div class="lbl mb8 mt16">Requirements</div>
+        <table class="ref-table">
+          <tr><th>Dependency</th><th>Version</th><th>Role</th></tr>
+          <tr><td>Node.js</td><td>≥ 20.12.0</td><td>Required — loader hooks API</td></tr>
+          <tr><td>uv</td><td>≥ 0.3</td><td>Python runtime (optional)</td></tr>
+          <tr><td>@anthropic-ai/sandbox-runtime</td><td>≥ 0.0.49</td><td>OS-level sandbox</td></tr>
+          <tr><td>@modelcontextprotocol/sdk</td><td>≥ 1.0.0</td><td>MCP server + client</td></tr>
+        </table>
+
+        <div class="lbl mb8 mt16">Agent-specific commands</div>
+        <div class="cb"><span class="cmt" style="color:var(--dim)"># Check which plugins are configured</span>
+<span class="cmd" style="color:var(--green)">mcp-exec-check-plugins</span>
+
+<span class="cmt" style="color:var(--dim)"># Prime CLAUDE.md for mcp-exec usage</span>
+<span class="cmd" style="color:var(--green)">mcp-exec-prime-skill</span></div>
+
+        <div class="callout mt16">
+          <strong>Source:</strong> <a href="https://github.com/joeblackwaslike/mcp-exec" style="color:var(--sky)">github.com/joeblackwaslike/mcp-exec</a><br>
+          <strong>npm:</strong> <a href="https://www.npmjs.com/package/@joeblackwaslike2/mcp-exec" style="color:var(--sky)">@joeblackwaslike2/mcp-exec</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+'use strict';
+
+// ─── TYPE SYSTEM ─────────────────────────────────────────────────────────────
+
+const NK = {
+  agent:         '#3b4a6b',
+  mcp_server:    '#1e5a3f',
+  sandbox:       '#4a1a4a',
+  session:       '#1a3a5c',
+  catalog:       '#2d4a1e',
+  tool_summary:  '#3d6b2a',
+  runtime_node:  '#6b3d1a',
+  runtime_bash:  '#1a4a4a',
+  runtime_python:'#4a3d1a',
+  bridge:        '#3d1a4a',
+  loader:        '#1a3d4a',
+  virtual_module:'#4a2a1a',
+  mcp_client:    '#1a1a5c',
+  exec_result:   '#3a3a1a',
+  tool_call_rec: '#5c2a1a',
+};
+
+const NI = {
+  agent:         '◈',
+  mcp_server:    '⬡',
+  sandbox:       '🔒',
+  session:       '◎',
+  catalog:       '⊞',
+  tool_summary:  '◇',
+  runtime_node:  'Ⓝ',
+  runtime_bash:  '$',
+  runtime_python:'Ⓟ',
+  bridge:        '⇌',
+  loader:        '↪',
+  virtual_module:'○',
+  mcp_client:    '⬛',
+  exec_result:   '→',
+  tool_call_rec: '⚡',
+};
+
+const EK = {
+  calls:       { color: '#38bdf8', dash: '' },
+  dispatches:  { color: '#4ade80', dash: '' },
+  imports:     { color: '#c084fc', dash: '5,3' },
+  bridges_to:  { color: '#f472b6', dash: '5,3' },
+  returns:     { color: '#fb923c', dash: '' },
+  contains:    { color: '#475569', dash: '' },
+  resolves:    { color: '#818cf8', dash: '5,3' },
+  searches:    { color: '#38bdf8', dash: '' },
+  records:     { color: '#f87171', dash: '4,2' },
+};
+
+// ─── PROPERTY PANEL ─────────────────────────────────────────────────────────
+
+function openPropPanel(datum) {
+  const panel  = document.getElementById('prop-panel');
+  const overlay= document.getElementById('prop-overlay');
+  const badge  = document.getElementById('pp-badge');
+  const uri    = document.getElementById('pp-uri');
+  const table  = document.getElementById('pp-table');
+
+  const color = NK[datum.kind] ?? '#475569';
+  badge.textContent = datum.kind;
+  badge.style.background = color + '33';
+  badge.style.color = lighten(color, 60);
+  badge.style.border = `1px solid ${color}55`;
+
+  uri.textContent = datum.uri || datum.label || datum.id;
+
+  const rows = Object.entries(datum.props || {});
+  table.innerHTML = rows.map(([k,v]) =>
+    `<tr><td>${k}</td><td>${escHtml(String(v))}</td></tr>`
+  ).join('');
+
+  panel.classList.add('open');
+  overlay.classList.add('open');
+}
+
+function closePropPanel() {
+  document.getElementById('prop-panel').classList.remove('open');
+  document.getElementById('prop-overlay').classList.remove('open');
+}
+
+document.getElementById('prop-overlay').addEventListener('click', closePropPanel);
+document.getElementById('pp-close').addEventListener('click', closePropPanel);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePropPanel(); });
+
+function escHtml(s) {
+  return s.replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+}
+function lighten(hex, pct) {
+  const n = Number.parseInt(hex.slice(1), 16);
+  const r = Math.min(255, (n>>16) + pct), g = Math.min(255, ((n>>8)&0xff) + pct), b = Math.min(255, (n&0xff) + pct);
+  return `rgb(${r},${g},${b})`;
+}
+
+// ─── DRAWING HELPERS ─────────────────────────────────────────────────────────
+
+function addArrowDefs(svg, id = 'arrow') {
+  const defs = svg.append('defs');
+  defs.append('marker')
+    .attr('id', id).attr('markerWidth',8).attr('markerHeight',8)
+    .attr('refX',6).attr('refY',3).attr('orient','auto')
+    .append('path').attr('d','M0,0 L0,6 L8,3 Z').attr('fill','#475569');
+
+  // Colored markers
+  Object.entries(EK).forEach(([kind, {color}]) => {
+    defs.append('marker')
+      .attr('id', `arrow-${kind}`).attr('markerWidth',8).attr('markerHeight',8)
+      .attr('refX',6).attr('refY',3).attr('orient','auto')
+      .append('path').attr('d','M0,0 L0,6 L8,3 Z').attr('fill', color);
+  });
+  return svg;
+}
+
+function drawNode(g, node) {
+  const color = NK[node.kind] ?? '#475569';
+  const icon  = NI[node.kind] ?? '◉';
+  const ng = g.append('g')
+    .attr('transform', `translate(${node.x},${node.y})`)
+    .style('cursor','pointer');
+
+  ng.append('circle').attr('r', node.r + 7).attr('fill', color).attr('opacity', 0.15);
+  const circle = ng.append('circle').attr('r', node.r).attr('fill', color);
+  ng.append('text').attr('text-anchor','middle').attr('dy','0.35em')
+    .attr('fill','#fff').attr('font-size', Math.max(9, node.r * 0.65))
+    .attr('font-family','monospace').text(icon);
+  ng.append('text').attr('y', node.r + 14).attr('text-anchor','middle')
+    .attr('fill','#7a9ab8').attr('font-size',9).text(node.label);
+
+  ng.on('mouseover', () => circle.attr('r', node.r + 4).attr('opacity',0.9));
+  ng.on('mouseout',  () => circle.attr('r', node.r).attr('opacity',1));
+  ng.on('click', () => openPropPanel(node));
+  return ng;
+}
+
+function drawEdge(g, link, nodeMap, opts={}) {
+  const ek  = EK[link.kind] ?? { color:'#475569', dash:'' };
+  const src = nodeMap[link.source];
+  const tgt = nodeMap[link.target];
+  if (!src || !tgt) return;
+
+  const dx = tgt.x - src.x, dy = tgt.y - src.y;
+  const len = Math.hypot(dx, dy);
+  const ux = dx/len, uy = dy/len;
+  const sr = src.r + 8, tr = tgt.r + 8;
+
+  const x1 = src.x + ux*sr, y1 = src.y + uy*sr;
+  const x2 = tgt.x - ux*tr, y2 = tgt.y - uy*tr;
+  const curve = opts.straight ? 0 : (opts.curve ?? -35);
+  const mx = (x1+x2)/2 - curve*uy, my = (y1+y2)/2 + curve*ux;
+
+  const path = g.append('path')
+    .attr('d', `M${x1},${y1} Q${mx},${my} ${x2},${y2}`)
+    .attr('fill','none')
+    .attr('stroke', ek.color)
+    .attr('stroke-width', 1.5)
+    .attr('stroke-dasharray', ek.dash || null)
+    .attr('marker-end', `url(#arrow-${link.kind})`)
+    .attr('opacity', opts.hidden ? 0 : 1);
+
+  if (link.label) {
+    const lx = (x1+x2)/2 - (curve/2)*uy - 20;
+    const ly = (y1+y2)/2 + (curve/2)*ux - 6;
+    g.append('text').attr('x', lx).attr('y', ly)
+      .attr('fill', ek.color).attr('font-size',8).attr('font-family','monospace')
+      .text(link.label);
+  }
+  return path;
+}
+
+// ─── ARCH GRAPH ──────────────────────────────────────────────────────────────
+
+(function buildArch() {
+  const svg = d3.select('#arch-svg');
+  const W = 1100, H = 520;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+  addArrowDefs(svg);
+
+  const nodes = [
+    { id:'agent',     kind:'agent',         label:'Claude',           x:90,  y:100, r:22,
+      uri:'agent://claude',
+      props:{model:'claude-sonnet-4-6', tools_registered:2, context_window:'200k', mode:'agentic'}},
+    { id:'mcp_exec',  kind:'mcp_server',    label:'mcp-exec server',  x:270, y:100, r:20,
+      uri:'mcp://mcp-exec',
+      props:{name:'mcp-exec', version:'1.0.0', transport:'stdio', tools:'tools, exec', node_version:'>=20.12.0'}},
+    { id:'sandbox',   kind:'sandbox',       label:'srt sandbox',      x:450, y:100, r:20,
+      uri:'sandbox://srt',
+      props:{type:'SandboxManager', network:'allowedDomains enforced', fs:'allowWrite + denyRead', env:'filtered allowlist'}},
+    { id:'session',   kind:'session',       label:'vm.Context',       x:630, y:60,  r:18,
+      uri:'session://__implicit__',
+      props:{id:'__implicit__', idle_timeout_ms:600000, max_sessions:100, created_at:'2026-05-26T10:00Z', last_used:'2026-05-26T10:14Z'}},
+    { id:'catalog',   kind:'catalog',       label:'Tool Catalog',     x:270, y:260, r:20,
+      uri:'catalog://tool-index',
+      props:{total_tools:47, servers:7, unavailable:0, search:'substring-AND', stop_words:'a,an,the,and,or...'}},
+    { id:'ts1',       kind:'tool_summary',  label:'listPullRequests', x:100, y:360, r:14,
+      uri:'tool://github/listPullRequests',
+      props:{server:'github', name:'listPullRequests', signature:'listPullRequests(owner: string, repo: string, state?: string): unknown', tokens:'~90'}},
+    { id:'ts2',       kind:'tool_summary',  label:'postMessage',      x:270, y:390, r:14,
+      uri:'tool://slack/postMessage',
+      props:{server:'slack', name:'postMessage', signature:'postMessage(channel: string, text: string, blocks?: array): unknown', tokens:'~75'}},
+    { id:'ts3',       kind:'tool_summary',  label:'listMessages',     x:440, y:360, r:14,
+      uri:'tool://gmail/listMessages',
+      props:{server:'gmail', name:'listMessages', signature:'listMessages(query?: string, maxResults?: number): unknown', tokens:'~85'}},
+    { id:'rnode',     kind:'runtime_node',  label:'Node runtime',     x:630, y:200, r:18,
+      uri:'runtime://node',
+      props:{type:'vm.runInContext', wrapping:'IIFE async', result:'IIFE return value', state:'persistent per session', loader:'USE_MAIN_CONTEXT_DEFAULT_LOADER'}},
+    { id:'rbash',     kind:'runtime_bash',  label:'Bash runtime',     x:800, y:140, r:16,
+      uri:'runtime://bash',
+      props:{type:'spawn bash -c', state:'stateless', result:'stdout', timeout_signal:'SIGTERM→SIGKILL', exit_124:'timeout'}},
+    { id:'rpython',   kind:'runtime_python',label:'Python runtime',   x:800, y:260, r:16,
+      uri:'runtime://python',
+      props:{type:'spawn uv run --isolated', state:'stateless', result:'stdout', pep723:'inline deps supported', env:'PYTHONPATH=pkgDir'}},
+    { id:'bridge',    kind:'bridge',        label:'HTTP Bridge',      x:970, y:340, r:18,
+      uri:'bridge://127.0.0.1:{port}',
+      props:{listen:'127.0.0.1:{random_port}', endpoint:'POST /call', request:'{server,tool,args,execId}', response:'{result}|{error}', log:'per execId tool_calls'}},
+    { id:'loader',    kind:'loader',        label:'Loader Hooks',     x:800, y:80,  r:16,
+      uri:'loader://node-module-hooks',
+      props:{registered_via:'module.register()',intercepts:"specifier.startsWith('mcp/')",format:'module',short_circuit:true}},
+    { id:'vmod',      kind:'virtual_module',label:'virtual:mcp/github',x:970,y:100, r:14,
+      uri:'virtual:mcp/github',
+      props:{generated:'yes', exports:'one async fn per tool', binding:'globalThis.__mcpClients[server].callTool', size:'~200 bytes per tool'}},
+    { id:'mclient',   kind:'mcp_client',    label:'MCP Client',       x:970, y:200, r:16,
+      uri:'mcp-client://github',
+      props:{transport:'StdioClientTransport', server:'github', protocol:'MCP 1.0', connected:true, tools_count:12}},
+    { id:'eresult',   kind:'exec_result',   label:'ExecResult',       x:90,  y:200, r:16,
+      uri:'exec-result://latest',
+      props:{result:'shaped data', stdout:'raw stdout', stderr:'any errors', exitCode:0, tool_calls:'[{server,tool,duration_ms}]'}},
+    { id:'tcrec',     kind:'tool_call_rec', label:'ToolCallRecord',   x:630, y:380, r:14,
+      uri:'tool-call://github/listPullRequests',
+      props:{server:'github', tool:'listPullRequests', duration_ms:312, error:'undefined'}},
+  ];
+
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+  const edges = [
+    { source:'agent',    target:'mcp_exec',  kind:'calls',      label:'tools/exec' },
+    { source:'mcp_exec', target:'sandbox',   kind:'contains',   label:'' },
+    { source:'sandbox',  target:'rnode',     kind:'dispatches', label:'node' },
+    { source:'sandbox',  target:'rbash',     kind:'dispatches', label:'bash' },
+    { source:'sandbox',  target:'rpython',   kind:'dispatches', label:'python' },
+    { source:'mcp_exec', target:'catalog',   kind:'searches',   label:'query' },
+    { source:'catalog',  target:'ts1',       kind:'returns',    label:'' },
+    { source:'catalog',  target:'ts2',       kind:'returns',    label:'' },
+    { source:'catalog',  target:'ts3',       kind:'returns',    label:'' },
+    { source:'rnode',    target:'session',   kind:'contains',   label:'vm.Context' },
+    { source:'rnode',    target:'loader',    kind:'imports',    label:'mcp/server' },
+    { source:'loader',   target:'vmod',      kind:'resolves',   label:'virtual:' },
+    { source:'vmod',     target:'mclient',   kind:'calls',      label:'callTool' },
+    { source:'rpython',  target:'bridge',    kind:'bridges_to', label:'HTTP POST' },
+    { source:'bridge',   target:'mclient',   kind:'calls',      label:'callTool' },
+    { source:'mclient',  target:'tcrec',     kind:'records',    label:'' },
+    { source:'rnode',    target:'eresult',   kind:'returns',    label:'result' },
+    { source:'eresult',  target:'agent',     kind:'returns',    label:'' },
+  ];
+
+  const g = svg.append('g');
+  edges.forEach(e => drawEdge(g, e, nodeMap, {curve:-25}));
+  nodes.forEach(n => drawNode(g, n));
+
+  // Node legend
+  const legendEl = document.getElementById('arch-node-legend');
+  Object.entries(NK).forEach(([kind, color]) => {
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<div class="legend-dot" style="background:${color}"></div>
+      <span class="legend-icon" style="color:${lighten(color,60)}">${NI[kind]}</span>
+      <span class="legend-name">${kind.replaceAll('_',' ')}</span>`;
+    item.addEventListener('click', () => {
+      const n = nodes.find(x => x.kind === kind);
+      if (n) openPropPanel(n);
+    });
+    legendEl.appendChild(item);
+  });
+
+  // Edge legend
+  const edgeLegendEl = document.getElementById('arch-edge-legend');
+  Object.entries(EK).forEach(([kind, {color, dash}]) => {
+    const item = document.createElement('div');
+    item.className = 'edge-item';
+    const lineStyle = dash ? `border-top:2px dashed ${color}` : `background:${color}`;
+    item.innerHTML = `<div class="edge-line" style="${lineStyle};height:2px"></div>
+      <span style="color:${color};font-family:var(--mono);font-size:10px">${kind}</span>`;
+    edgeLegendEl.appendChild(item);
+  });
+})();
+
+// ─── TOOLS FLOW ──────────────────────────────────────────────────────────────
+
+(function buildToolsFlow() {
+  const svg = d3.select('#tools-svg');
+  const W = 1100, H = 340;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+  addArrowDefs(svg);
+
+  const nodes = [
+    { id:'claude',    kind:'agent',        label:'Claude',           x:80,  y:170, r:22,
+      uri:'agent://claude',
+      props:{action:'calls tools("pull requests")', expects:'trimmed summaries ~80-120 tok each', sees_schemas:false}},
+    { id:'server',    kind:'mcp_server',   label:'mcp-exec server',  x:270, y:170, r:20,
+      uri:'mcp://mcp-exec',
+      props:{handler:'ListToolsRequestSchema', routes_to:'searchTools(query)', returns:'JSON array of CatalogEntry'}},
+    { id:'cat',       kind:'catalog',      label:'Tool Catalog',     x:490, y:170, r:20,
+      uri:'catalog://tool-index',
+      props:{query:'"pull requests"', tokens:['pull','requests'], stop_words_filtered:true, match_strategy:'every token in name+description', results:3}},
+    { id:'s1',        kind:'tool_summary', label:'listPullRequests', x:700, y:80,  r:16,
+      uri:'tool://github/listPullRequests',
+      props:{server:'github', name:'listPullRequests', description:'List pull requests for a GitHub repository', signature:'listPullRequests(owner: string, repo: string, state?: string, per_page?: number): unknown', approx_tokens:88}},
+    { id:'s2',        kind:'tool_summary', label:'getPullRequest',   x:700, y:170, r:16,
+      uri:'tool://github/getPullRequest',
+      props:{server:'github', name:'getPullRequest', description:'Get a single pull request by number', signature:'getPullRequest(owner: string, repo: string, pull_number: number): unknown', approx_tokens:82}},
+    { id:'s3',        kind:'tool_summary', label:'mergePullRequest', x:700, y:260, r:16,
+      uri:'tool://github/mergePullRequest',
+      props:{server:'github', name:'mergePullRequest', description:'Merge a pull request', signature:'mergePullRequest(owner: string, repo: string, pull_number: number, commit_title?: string): unknown', approx_tokens:91}},
+    { id:'res',       kind:'exec_result',  label:'ExecResult',       x:920, y:170, r:18,
+      uri:'exec-result://tools-query',
+      props:{result:'JSON array, 3 ToolSummary objects', total_tokens:'~261', schemas_loaded:false, catalog_size_in_context:0}},
+  ];
+
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const edges = [
+    { source:'claude', target:'server', kind:'calls',    label:'tools("pull requests")', id:'e0' },
+    { source:'server', target:'cat',    kind:'searches', label:'searchTools()',          id:'e1' },
+    { source:'cat',    target:'s1',     kind:'returns',  label:'',                       id:'e2' },
+    { source:'cat',    target:'s2',     kind:'returns',  label:'',                       id:'e3' },
+    { source:'cat',    target:'s3',     kind:'returns',  label:'',                       id:'e4' },
+    { source:'s1',     target:'res',    kind:'returns',  label:'',                       id:'e5' },
+    { source:'s2',     target:'res',    kind:'returns',  label:'',                       id:'e6' },
+    { source:'s3',     target:'res',    kind:'returns',  label:'',                       id:'e7' },
+    { source:'res',    target:'claude', kind:'returns',  label:'261 tokens',             id:'e8' },
+  ];
+
+  const g = svg.append('g');
+  const edgePaths = {};
+  edges.forEach(e => { edgePaths[e.id] = drawEdge(g, e, nodeMap, {hidden:true, curve:-30}); });
+  nodes.forEach(n => drawNode(g, n));
+
+  let timer = null;
+  const ORDER = ['e0','e1','e2','e3','e4','e5','e6','e7','e8'];
+
+  function reveal(idx) {
+    if (idx >= ORDER.length) { document.getElementById('tools-play').disabled = false; return; }
+    const p = edgePaths[ORDER[idx]];
+    if (p) p.transition().duration(400).attr('opacity', 1);
+    timer = setTimeout(() => reveal(idx+1), 550);
+  }
+
+  document.getElementById('tools-play').addEventListener('click', function() {
+    this.disabled = true;
+    Object.values(edgePaths).forEach(p => p && p.attr('opacity',0));
+    reveal(0);
+  });
+  document.getElementById('tools-reset').addEventListener('click', () => {
+    clearTimeout(timer);
+    document.getElementById('tools-play').disabled = false;
+    Object.values(edgePaths).forEach(p => p && p.attr('opacity',0));
+  });
+})();
+
+// ─── NODE EXEC FLOW ──────────────────────────────────────────────────────────
+
+(function buildNodeFlow() {
+  const svg = d3.select('#node-svg');
+  const W = 1100, H = 380;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+  addArrowDefs(svg);
+
+  const nodes = [
+    { id:'claude',  kind:'agent',         label:'Claude',            x:70,  y:190, r:22,
+      uri:'agent://claude',
+      props:{sends:'exec({code, runtime:"node", session_id:undefined})', receives:'ExecResult.result'}},
+    { id:'sbox',    kind:'sandbox',       label:'srt sandbox',       x:220, y:190, r:20,
+      uri:'sandbox://srt',
+      props:{wraps:'mcp-exec process', network:'api.github.com allowed', fs:'allowWrite:/tmp', initialized:true}},
+    { id:'sess',    kind:'session',       label:'vm.Context',        x:370, y:190, r:18,
+      uri:'session://__implicit__',
+      props:{id:'__implicit__',last_used:'2026-05-26T10:14:22Z',expiry_in_ms:498000,size_globals:16}},
+    { id:'rnode',   kind:'runtime_node',  label:'Node runtime',      x:510, y:190, r:18,
+      uri:'runtime://node',
+      props:{wrapped_code:'(async () => { ... })()', context:'vm.Context', importModuleDynamically:'USE_MAIN_CONTEXT_DEFAULT_LOADER'}},
+    { id:'loader',  kind:'loader',        label:'Loader Hooks',      x:660, y:120, r:16,
+      uri:'loader://node-module-hooks',
+      props:{intercepts:"import('mcp/github')", resolves_to:'virtual:mcp/github', method:'resolve()+load()'}},
+    { id:'vmod',    kind:'virtual_module',label:'virtual:mcp/github',x:820, y:70,  r:14,
+      uri:'virtual:mcp/github',
+      props:{exports:'listPullRequests, createPullRequest, ...12 more', generated_at:'startup', binding:'globalThis.__mcpClients'}},
+    { id:'mc',      kind:'mcp_client',    label:'MCP Client (github)',x:990, y:70,  r:16,
+      uri:'mcp-client://github',
+      props:{transport:'StdioClientTransport', server:'npx @github/mcp', protocol:'MCP 1.0', callTool:'listPullRequests({owner:"acme"})'}},
+    { id:'tcrec',   kind:'tool_call_rec', label:'ToolCallRecord',    x:820, y:200, r:14,
+      uri:'tool-call://github/listPullRequests',
+      props:{server:'github', tool:'listPullRequests', duration_ms:312, error:undefined, logged_on:'ExecResult.tool_calls'}},
+    { id:'eres',    kind:'exec_result',   label:'ExecResult',        x:660, y:320, r:16,
+      uri:'exec-result://node-exec',
+      props:{result:'{openPRs:7,blockedIssues:2,staleReviews:[...]}', stdout:'', stderr:'', exitCode:0, tool_calls_count:2}},
+  ];
+
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const edges = [
+    { source:'claude', target:'sbox',   kind:'calls',    label:'exec(code, "node")', id:'e0' },
+    { source:'sbox',   target:'sess',   kind:'dispatches',label:'getOrCreate()',     id:'e1' },
+    { source:'sess',   target:'rnode',  kind:'contains', label:'',                  id:'e2' },
+    { source:'rnode',  target:'loader', kind:'imports',  label:"import('mcp/github')",id:'e3'},
+    { source:'loader', target:'vmod',   kind:'resolves', label:'virtual module',    id:'e4' },
+    { source:'vmod',   target:'mc',     kind:'calls',    label:'callTool()',         id:'e5' },
+    { source:'mc',     target:'tcrec',  kind:'records',  label:'duration_ms',       id:'e6' },
+    { source:'rnode',  target:'eres',   kind:'returns',  label:'IIFE result',       id:'e7' },
+    { source:'eres',   target:'claude', kind:'returns',  label:'~60 tokens',        id:'e8' },
+  ];
+
+  const g = svg.append('g');
+  const edgePaths = {};
+  edges.forEach(e => { edgePaths[e.id] = drawEdge(g, e, nodeMap, {hidden:true, curve:-30}); });
+  nodes.forEach(n => drawNode(g, n));
+
+  let timer = null;
+  const ORDER = edges.map(e=>e.id);
+  function reveal(idx) {
+    if (idx >= ORDER.length) { document.getElementById('node-play').disabled = false; return; }
+    const p = edgePaths[ORDER[idx]];
+    if (p) p.transition().duration(400).attr('opacity', 1);
+    timer = setTimeout(() => reveal(idx+1), 580);
+  }
+  document.getElementById('node-play').addEventListener('click', function() {
+    this.disabled = true;
+    Object.values(edgePaths).forEach(p => p && p.attr('opacity',0));
+    reveal(0);
+  });
+  document.getElementById('node-reset').addEventListener('click', () => {
+    clearTimeout(timer);
+    document.getElementById('node-play').disabled = false;
+    Object.values(edgePaths).forEach(p => p && p.attr('opacity',0));
+  });
+})();
+
+// ─── PYTHON EXEC FLOW ────────────────────────────────────────────────────────
+
+(function buildPythonFlow() {
+  const svg = d3.select('#python-svg');
+  const W = 1100, H = 340;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+  addArrowDefs(svg);
+
+  const nodes = [
+    { id:'claude',  kind:'agent',         label:'Claude',            x:70,  y:170, r:22,
+      uri:'agent://claude',
+      props:{sends:'exec({code, runtime:"python"})', pep723:'inline deps in code comment'}},
+    { id:'sbox',    kind:'sandbox',       label:'srt sandbox',       x:230, y:170, r:20,
+      uri:'sandbox://srt',
+      props:{enforces:'network + fs + env', uv_allowed:true}},
+    { id:'rpy',     kind:'runtime_python',label:'Python runtime',    x:390, y:170, r:18,
+      uri:'runtime://python',
+      props:{action_1:'writeFile(/tmp/mcp-exec-{uuid}.py)',action_2:'generateMcpPackage({toolsByServer})',action_3:'spawn uv run --isolated', cleanup:'unlink tmpFile + removeMcpPackage'}},
+    { id:'pkg',     kind:'virtual_module',label:'mcp/ Python pkg',   x:390, y:80,  r:14,
+      uri:'tmpdir://mcp-exec-pkg-{uuid}/mcp/',
+      props:{location:'/tmp/mcp-exec-pkg-{uuid}/mcp/', files:'salesforce.py, gmail.py, __init__.py', injected_env:'PYTHONPATH=pkgDir'}},
+    { id:'uv',      kind:'runtime_bash',  label:'uv process',        x:560, y:170, r:16,
+      uri:'process://uv-run',
+      props:{command:'uv run --isolated /tmp/mcp-exec-{uuid}.py', isolated:true, env:'PYTHONPATH=/tmp/mcp-exec-pkg-{uuid}', venv:'per-call ephemeral'}},
+    { id:'bridge',  kind:'bridge',        label:'HTTP Bridge',       x:730, y:170, r:18,
+      uri:'bridge://127.0.0.1:{port}/call',
+      props:{port:'random at startup', endpoint:'POST /call', receives:'{server,tool,args,execId}', routes_to:'clients[server].callTool()', flushes:'tool_calls per execId after process exits'}},
+    { id:'mc',      kind:'mcp_client',    label:'MCP Client (sf)',   x:920, y:170, r:16,
+      uri:'mcp-client://salesforce',
+      props:{transport:'StdioClientTransport', server:'salesforce', tool_called:'search', args:'{q:"open opportunities"}'}},
+    { id:'eres',    kind:'exec_result',   label:'ExecResult',        x:730, y:300, r:16,
+      uri:'exec-result://python-exec',
+      props:{result:'stdout = JSON array of 5 rows', exitCode:0, tool_calls:'[{server:"salesforce",tool:"search",duration_ms:445}]'}},
+  ];
+
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const edges = [
+    { source:'claude', target:'sbox',   kind:'calls',      label:'exec(code,"python")', id:'e0' },
+    { source:'sbox',   target:'rpy',    kind:'dispatches', label:'runInPython()',        id:'e1' },
+    { source:'rpy',    target:'pkg',    kind:'contains',   label:'generateMcpPackage()', id:'e2' },
+    { source:'rpy',    target:'uv',     kind:'dispatches', label:'spawn uv run',         id:'e3' },
+    { source:'uv',     target:'bridge', kind:'bridges_to', label:'POST /call',           id:'e4' },
+    { source:'bridge', target:'mc',     kind:'calls',      label:'callTool()',           id:'e5' },
+    { source:'bridge', target:'eres',   kind:'records',    label:'flushCalls(execId)',   id:'e6' },
+    { source:'uv',     target:'eres',   kind:'returns',    label:'stdout',               id:'e7' },
+    { source:'eres',   target:'claude', kind:'returns',    label:'~80 tokens',           id:'e8' },
+  ];
+
+  const g = svg.append('g');
+  const edgePaths = {};
+  edges.forEach(e => { edgePaths[e.id] = drawEdge(g, e, nodeMap, {hidden:true, curve:-25}); });
+  nodes.forEach(n => drawNode(g, n));
+
+  let timer = null;
+  const ORDER = edges.map(e=>e.id);
+  function reveal(idx) {
+    if (idx >= ORDER.length) { document.getElementById('python-play').disabled = false; return; }
+    const p = edgePaths[ORDER[idx]];
+    if (p) p.transition().duration(400).attr('opacity',1);
+    timer = setTimeout(() => reveal(idx+1), 600);
+  }
+  document.getElementById('python-play').addEventListener('click', function() {
+    this.disabled = true;
+    Object.values(edgePaths).forEach(p => p && p.attr('opacity',0));
+    reveal(0);
+  });
+  document.getElementById('python-reset').addEventListener('click', () => {
+    clearTimeout(timer);
+    document.getElementById('python-play').disabled = false;
+    Object.values(edgePaths).forEach(p => p && p.attr('opacity',0));
+  });
+})();
+
+// ─── BASH EXEC FLOW ──────────────────────────────────────────────────────────
+
+(function buildBashFlow() {
+  const svg = d3.select('#bash-svg');
+  const W = 1100, H = 260;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+  addArrowDefs(svg);
+
+  const nodes = [
+    { id:'claude', kind:'agent',        label:'Claude',         x:80,  y:130, r:22,
+      uri:'agent://claude',
+      props:{sends:'exec({code:"awk ...", runtime:"bash"})', no_session:true, no_mcp_imports:true}},
+    { id:'sbox',   kind:'sandbox',      label:'srt sandbox',    x:270, y:130, r:20,
+      uri:'sandbox://srt',
+      props:{env_filtered:'PATH,HOME,TMPDIR only', network:'enforced', code_sees_no_process:true}},
+    { id:'rbash',  kind:'runtime_bash', label:'Bash runtime',   x:460, y:130, r:18,
+      uri:'runtime://bash',
+      props:{action:'spawn("bash",["-c",code])', stdin:'ignore', stdio:'pipe stdout+stderr', env:'filterEnv(allowedEnv)'}},
+    { id:'proc',   kind:'virtual_module',label:'bash subprocess',x:650, y:130, r:16,
+      uri:'process://bash-subprocess',
+      props:{pid:'ephemeral', code:'awk -F, NR>1 {count[$3]++} ...', timeout_ms:'30000', exit_code:0}},
+    { id:'eres',   kind:'exec_result',  label:'ExecResult',     x:850, y:130, r:16,
+      uri:'exec-result://bash-exec',
+      props:{result:'stdout string', stdout:'500 24312\n401 8943\n...', stderr:'', exitCode:0, tool_calls:'[]'}},
+  ];
+
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const edges = [
+    { source:'claude', target:'sbox',  kind:'calls',      label:'exec(code,"bash")', id:'e0' },
+    { source:'sbox',   target:'rbash', kind:'dispatches', label:'runInBash()',        id:'e1' },
+    { source:'rbash',  target:'proc',  kind:'dispatches', label:'spawn bash -c',     id:'e2' },
+    { source:'proc',   target:'eres',  kind:'returns',    label:'stdout captured',   id:'e3' },
+    { source:'eres',   target:'claude',kind:'returns',    label:'~20 tokens',        id:'e4' },
+  ];
+
+  const g = svg.append('g');
+  const edgePaths = {};
+  edges.forEach(e => { edgePaths[e.id] = drawEdge(g, e, nodeMap, {hidden:true, straight:true}); });
+  nodes.forEach(n => drawNode(g, n));
+
+  let timer = null;
+  const ORDER = edges.map(e=>e.id);
+  function reveal(idx) {
+    if (idx >= ORDER.length) { document.getElementById('bash-play').disabled = false; return; }
+    const p = edgePaths[ORDER[idx]];
+    if (p) p.transition().duration(400).attr('opacity',1);
+    timer = setTimeout(() => reveal(idx+1), 600);
+  }
+  document.getElementById('bash-play').addEventListener('click', function() {
+    this.disabled = true;
+    Object.values(edgePaths).forEach(p => p && p.attr('opacity',0));
+    reveal(0);
+  });
+  document.getElementById('bash-reset').addEventListener('click', () => {
+    clearTimeout(timer);
+    document.getElementById('bash-play').disabled = false;
+    Object.values(edgePaths).forEach(p => p && p.attr('opacity',0));
+  });
+})();
+
+// ─── SESSION STATE MACHINE ───────────────────────────────────────────────────
+
+(function buildSessionMachine() {
+  const states = [
+    { id:'created',   label:'Created',  color:'#3b4a6b', desc:'vm.createContext() called. Globals injected: safe Node.js APIs + __mcpClients + __session_id. Expiry timer started (10 min).' },
+    { id:'active',    label:'Active',   color:'#1e5a3f', desc:'vm.runInContext(IIFE) executing. __mcpClients bridged to globalThis. console captured into stdoutChunks/stderrChunks. Expiry timer reset on each call.' },
+    { id:'idle',      label:'Idle',     color:'#1a3a5c', desc:'Awaiting next exec() call. State variables persist on the vm.Context. Expiry timer counting down from last used timestamp.' },
+    { id:'expiring',  label:'Expiring', color:'#4a3d1a', desc:'10 minutes elapsed since last use. setTimeout fires: sessions.delete(id). The vm.Context is GC-eligible after this.' },
+    { id:'destroyed', label:'Destroyed',color:'#5c2a1a', desc:'Session removed from Map. vm.Context eligible for garbage collection. All state variables are gone. Next exec() call for this session_id creates a new context.' },
+  ];
+
+  const container = document.getElementById('session-states');
+  const row = document.createElement('div');
+  row.className = 'states-row';
+
+  const boxes = states.map((s, i) => {
+    const box = document.createElement('div');
+    box.className = 'state-box';
+    box.textContent = s.label;
+    box.style.borderColor = s.color;
+    box.style.color = lighten(s.color, 80);
+    box.addEventListener('click', () => showDesc(i));
+    row.appendChild(box);
+    if (i < states.length-1) {
+      const arr = document.createElement('div');
+      arr.textContent = '→';
+      arr.style.cssText = 'color:var(--dim);font-size:14px;display:flex;align-items:center;margin-top:8px';
+      row.appendChild(arr);
+    }
+    return box;
+  });
+  container.appendChild(row);
+
+  const desc = document.getElementById('session-desc');
+  function showDesc(i) {
+    boxes.forEach((b,j) => {
+      const s = states[j];
+      b.style.background = j===i ? s.color+'55' : 'transparent';
+      b.classList.toggle('active', j===i);
+    });
+    desc.textContent = states[i].desc;
+  }
+
+  let idx = 0, interval = null;
+  document.getElementById('session-play').addEventListener('click', function() {
+    if (interval) return;
+    this.textContent = '⏸ Pause';
+    this.onclick = () => {
+      clearInterval(interval); interval = null;
+      this.textContent = '▶ Animate lifecycle';
+      this.onclick = startAnim;
+    };
+    interval = setInterval(() => { idx = (idx+1) % states.length; showDesc(idx); }, 1400);
+    showDesc(idx);
+  });
+
+  function startAnim() {
+    interval = setInterval(() => { idx = (idx+1) % states.length; showDesc(idx); }, 1400);
+    document.getElementById('session-play').textContent = '⏸ Pause';
+    document.getElementById('session-play').onclick = () => {
+      clearInterval(interval); interval = null;
+      document.getElementById('session-play').textContent = '▶ Animate lifecycle';
+      document.getElementById('session-play').onclick = startAnim;
+    };
+    showDesc(idx);
+  }
+
+  document.getElementById('session-reset').addEventListener('click', () => {
+    clearInterval(interval); interval = null;
+    idx = 0;
+    boxes.forEach(b => { b.style.background = 'transparent'; b.classList.remove('active'); });
+    desc.textContent = 'Click Play to animate the session lifecycle.';
+    document.getElementById('session-play').textContent = '▶ Animate lifecycle';
+    document.getElementById('session-play').onclick = startAnim;
+  });
+
+  // Session state diagram SVG
+  const svg = d3.select('#session-svg');
+  const W = 1100, H = 200;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+  addArrowDefs(svg, 'sess-arrow');
+
+  const sNodes = [
+    {id:'s0', label:'Session Map',      x:100, y:100, r:22, color:'#1a3a5c',  icon:'◎'},
+    {id:'s1', label:'getOrCreate()',    x:300, y:100, r:18, color:'#2d4a1e',  icon:'⊞'},
+    {id:'s2', label:'vm.createContext', x:500, y:60,  r:16, color:'#1e5a3f',  icon:'○'},
+    {id:'s3', label:'existing context', x:500, y:140, r:16, color:'#1a3a5c',  icon:'◎'},
+    {id:'s4', label:'expiryTimer',      x:700, y:100, r:16, color:'#4a3d1a',  icon:'⚡'},
+    {id:'s5', label:'sessions.delete', x:900, y:100, r:16, color:'#5c2a1a',  icon:'✕'},
+  ];
+
+  const sg = svg.append('g');
+  const snm = Object.fromEntries(sNodes.map(n=>[n.id,n]));
+
+  const sEdges = [
+    {source:'s0',target:'s1',kind:'dispatches',label:'exec() call'},
+    {source:'s1',target:'s2',kind:'calls',label:'not found → new'},
+    {source:'s1',target:'s3',kind:'returns',label:'found → reuse'},
+    {source:'s2',target:'s4',kind:'contains',label:'setTimeout(10min)'},
+    {source:'s3',target:'s4',kind:'contains',label:'reset timer'},
+    {source:'s4',target:'s5',kind:'records',label:'10min elapsed'},
+  ];
+
+  sEdges.forEach(e => {
+    const ek = EK[e.kind] ?? {color:'#475569', dash:''};
+    const src = snm[e.source], tgt = snm[e.target];
+    const dx=tgt.x-src.x, dy=tgt.y-src.y, len=Math.hypot(dx, dy);
+    const ux=dx/len, uy=dy/len;
+    const x1=src.x+ux*(src.r+8), y1=src.y+uy*(src.r+8);
+    const x2=tgt.x-ux*(tgt.r+8), y2=tgt.y-uy*(tgt.r+8);
+    const mx=(x1+x2)/2, my=(y1+y2)/2-20;
+    sg.append('path').attr('d',`M${x1},${y1} Q${mx},${my} ${x2},${y2}`)
+      .attr('fill','none').attr('stroke',ek.color).attr('stroke-width',1.5)
+      .attr('stroke-dasharray',ek.dash||null).attr('marker-end',`url(#arrow-${e.kind})`);
+    sg.append('text').attr('x',mx-10).attr('y',my-5).attr('fill',ek.color)
+      .attr('font-size',8).attr('font-family','monospace').text(e.label);
+  });
+
+  sNodes.forEach(n => {
+    const ng = sg.append('g').attr('transform',`translate(${n.x},${n.y})`);
+    ng.append('circle').attr('r',n.r+6).attr('fill',n.color).attr('opacity',0.15);
+    ng.append('circle').attr('r',n.r).attr('fill',n.color);
+    ng.append('text').attr('text-anchor','middle').attr('dy','0.35em')
+      .attr('fill','#fff').attr('font-size',10).attr('font-family','monospace').text(n.icon);
+    ng.append('text').attr('y',n.r+13).attr('text-anchor','middle')
+      .attr('fill','#7a9ab8').attr('font-size',8.5).text(n.label);
+  });
+})();
+
+// ─── SANDBOX SWIMLANE ────────────────────────────────────────────────────────
+
+(function buildSandboxLane() {
+  const svg = d3.select('#sandbox-svg');
+  const W = 1100, H = 340;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+  const lanes = [
+    { label: 'Codex Platform Sandbox', color: '#5c2a1a', x: 0,   w: 1100 },
+    { label: 'srt (OS-level sandbox)', color: '#4a1a4a', x: 60,  w: 980  },
+    { label: 'mcp-exec Node process',  color: '#1e5a3f', x: 120, w: 860  },
+    { label: 'vm.Context (Node only)', color: '#1a3a5c', x: 180, w: 740  },
+  ];
+
+  // Draw nested rects
+  lanes.forEach((lane, i) => {
+    svg.append('rect')
+      .attr('x', lane.x).attr('y', 30 + i*10)
+      .attr('width', lane.w).attr('height', 290 - i*20)
+      .attr('rx', 8).attr('fill', 'none')
+      .attr('stroke', lane.color).attr('stroke-width', 2)
+      .attr('stroke-dasharray', (() => { if (i===0) { return '8,4'; } if (i===1) { return '5,3'; } return ''; })());
+    svg.append('text')
+      .attr('x', lane.x + 10).attr('y', 30 + i*10 + 16)
+      .attr('fill', lighten(lane.color, 60)).attr('font-size', 10)
+      .attr('font-weight', 700).attr('font-family', 'monospace')
+      .text(lane.label);
+  });
+
+  // Entities inside
+  const entities = [
+    { x: 260, y: 140, r: 20, kind: 'agent',         label: 'Claude Code' },
+    { x: 420, y: 140, r: 20, kind: 'mcp_server',    label: 'mcp-exec' },
+    { x: 580, y: 120, r: 16, kind: 'session',        label: 'vm.Context' },
+    { x: 580, y: 190, r: 16, kind: 'bridge',         label: 'HTTP Bridge' },
+    { x: 740, y: 140, r: 16, kind: 'runtime_node',   label: 'Node code' },
+    { x: 900, y: 140, r: 16, kind: 'mcp_client',     label: 'MCP Clients' },
+  ];
+
+  addArrowDefs(svg, 'sb-arrow');
+  const sg = svg.append('g');
+
+  const eLinks = [
+    {s:entities[0], t:entities[1], label:'tool call'},
+    {s:entities[1], t:entities[2], label:'getOrCreate'},
+    {s:entities[1], t:entities[3], label:'bridge.start()'},
+    {s:entities[2], t:entities[4], label:'vm.runInContext'},
+    {s:entities[3], t:entities[5], label:'HTTP proxy'},
+    {s:entities[4], t:entities[5], label:'callTool()'},
+  ];
+
+  eLinks.forEach(link => {
+    const dx=link.t.x-link.s.x, dy=link.t.y-link.s.y;
+    const len=Math.hypot(dx, dy);
+    const ux=dx/len, uy=dy/len;
+    const x1=link.s.x+ux*(link.s.r+8), y1=link.s.y+uy*(link.s.r+8);
+    const x2=link.t.x-ux*(link.t.r+8), y2=link.t.y-uy*(link.t.r+8);
+    sg.append('line').attr('x1',x1).attr('y1',y1).attr('x2',x2).attr('y2',y2)
+      .attr('stroke','#38bdf8').attr('stroke-width',1.5).attr('marker-end','url(#sb-arrow)');
+    sg.append('text').attr('x',(x1+x2)/2-15).attr('y',(y1+y2)/2-6)
+      .attr('fill','#38bdf8').attr('font-size',8).attr('font-family','monospace').text(link.label);
+  });
+
+  entities.forEach(n => {
+    const color = NK[n.kind] ?? '#475569';
+    const icon  = NI[n.kind] ?? '◉';
+    const ng = sg.append('g').attr('transform',`translate(${n.x},${n.y})`).style('cursor','pointer');
+    ng.append('circle').attr('r',n.r+6).attr('fill',color).attr('opacity',0.15);
+    ng.append('circle').attr('r',n.r).attr('fill',color);
+    ng.append('text').attr('text-anchor','middle').attr('dy','0.35em')
+      .attr('fill','#fff').attr('font-size',10).attr('font-family','monospace').text(icon);
+    ng.append('text').attr('y',n.r+13).attr('text-anchor','middle')
+      .attr('fill','#7a9ab8').attr('font-size',8.5).text(n.label);
+    ng.on('click', () => openPropPanel({...n, props:{kind:n.kind, layer: n.x < 420 ? 'Codex+srt' : n.x < 600 ? 'mcp-exec process' : 'srt inner'}}));
+  });
+
+  // Boundary labels
+  const boundaries = [
+    { x: 60, y: 310, label: '← srt sandbox boundary: network, fs, env enforced here' },
+    { x: 180, y: 320, label: '← vm.Context boundary: no process/require, Node only' },
+  ];
+  boundaries.forEach(b => {
+    svg.append('text').attr('x',b.x).attr('y',b.y)
+      .attr('fill','#3d5a78').attr('font-size',9).attr('font-family','monospace').text(b.label);
+  });
+})();
+
+// ─── HOOKS SWIMLANE ──────────────────────────────────────────────────────────
+
+(function buildHooksLane() {
+  const svg = d3.select('#hooks-svg');
+  const W = 1100, H = 300;
+  svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+  const lanes = ['Claude Code', 'Hook System', 'mcp-exec (MCP)', 'Sandbox (internal)'];
+  const laneW = W / lanes.length;
+
+  lanes.forEach((label, i) => {
+    svg.append('rect').attr('x', i*laneW).attr('y', 0).attr('width', laneW).attr('height', H)
+      .attr('fill', i%2===0 ? '#0f1a2e' : '#080e1a').attr('stroke','#1e3452').attr('stroke-width',1);
+    svg.append('text').attr('x', i*laneW + laneW/2).attr('y', 20)
+      .attr('text-anchor','middle').attr('fill','#7a9ab8').attr('font-size',10).attr('font-weight',700)
+      .text(label);
+  });
+
+  const steps = [
+    { laneIdx:0, y:60,  label:'Claude calls exec()',       color:'#38bdf8' },
+    { laneIdx:1, y:90,  label:'PreToolUse fires ✓',        color:'#4ade80' },
+    { laneIdx:2, y:120, label:'exec() handler runs',       color:'#4ade80' },
+    { laneIdx:3, y:150, label:'sandbox: runInNode()',       color:'#c084fc' },
+    { laneIdx:3, y:180, label:'import mcp/github (internal)',color:'#c084fc'},
+    { laneIdx:3, y:210, label:'MCP client called (invisible)',color:'#475569'},
+    { laneIdx:3, y:240, label:'ExecResult assembled',      color:'#fb923c' },
+    { laneIdx:2, y:260, label:'exec() returns ExecResult', color:'#4ade80' },
+    { laneIdx:1, y:280, label:'PostToolUse fires ✓',       color:'#4ade80' },
+  ];
+
+  addArrowDefs(svg, 'hook-arrow');
+
+  steps.forEach((s, i) => {
+    const cx = s.laneIdx * laneW + laneW/2;
+    svg.append('circle').attr('cx',cx).attr('cy',s.y).attr('r',7).attr('fill',s.color).attr('opacity',0.3);
+    svg.append('circle').attr('cx',cx).attr('cy',s.y).attr('r',4).attr('fill',s.color);
+    svg.append('text').attr('x',cx + 12).attr('y',s.y+4).attr('fill',s.color)
+      .attr('font-size',10).attr('font-family','monospace').text(s.label);
+
+    if (i < steps.length-1) {
+      const next = steps[i+1];
+      const nx = next.laneIdx * laneW + laneW/2;
+      const ny = next.y;
+      svg.append('line').attr('x1',cx).attr('y1',s.y+5).attr('x2',nx).attr('y2',ny-5)
+        .attr('stroke','#3d5a78').attr('stroke-width',1).attr('stroke-dasharray','3,2')
+        .attr('marker-end','url(#hook-arrow)');
+    }
+  });
+
+  // Big X for "hook system can't see inside"
+  svg.append('rect').attr('x',3*laneW+10).attr('y',165).attr('width',laneW-20).attr('height',30)
+    .attr('rx',4).attr('fill','rgba(248,113,113,0.05)').attr('stroke','rgba(248,113,113,0.2)');
+  svg.append('text').attr('x',3*laneW+laneW/2).attr('y',185).attr('text-anchor','middle')
+    .attr('fill','#f87171').attr('font-size',9).attr('font-family','monospace')
+    .text('← hook system has no visibility here');
+})();
+
+// ─── CONVERSATION FORCE GRAPH ────────────────────────────────────────────────
+
+(function buildConvoGraph() {
+  const container = document.getElementById('convo-svg');
+  const W = container.getBoundingClientRect().width || 1100;
+  const H = 520;
+  const svg = d3.select('#convo-svg').attr('viewBox', `0 0 ${W} ${H}`);
+  addArrowDefs(svg, 'convo-arrow');
+
+  const nodes = [
+    // Claude agent (center-ish)
+    { id:'claude', kind:'agent', label:'Claude', r:22,
+      uri:'agent://claude',
+      props:{model:'claude-sonnet-4-6', turns:4, tokens_saved:'~78,200', tools_used:'tools, exec(×3)'}},
+
+    // mcp-exec server
+    { id:'server', kind:'mcp_server', label:'mcp-exec', r:20,
+      uri:'mcp://mcp-exec',
+      props:{version:'1.0.0', uptime:'current session', calls_handled:4, bridge_port:49821}},
+
+    // Sandbox
+    { id:'sbox', kind:'sandbox', label:'srt sandbox', r:18,
+      uri:'sandbox://srt',
+      props:{network:'api.github.com, slack.com, gmail.googleapis.com', env_allow:'GITHUB_TOKEN, SLACK_TOKEN, SALESFORCE_TOKEN', fs_allow_write:'/tmp, ~/.mcp-exec/sessions'}},
+
+    // Session (implicit)
+    { id:'sess', kind:'session', label:'session (__implicit__)', r:16,
+      uri:'session://__implicit__',
+      props:{id:'__implicit__', exec_calls:2, state_keys:'emailSummary, crmReport', idle_ms:42000}},
+
+    // Catalog
+    { id:'cat', kind:'catalog', label:'Tool Catalog', r:18,
+      uri:'catalog://tool-index',
+      props:{total_tools:47, servers:'gmail,salesforce,slack,github,calendar,linear,notion', last_searched:'"email analytics"'}},
+
+    // Turn 1 tool summaries
+    { id:'ts_lm', kind:'tool_summary', label:'listMessages', r:13,
+      uri:'tool://gmail/listMessages',
+      props:{server:'gmail', signature:'listMessages(query?: string, maxResults?: number): unknown', approx_tokens:82}},
+    { id:'ts_se', kind:'tool_summary', label:'search (SF)', r:13,
+      uri:'tool://salesforce/search',
+      props:{server:'salesforce', signature:'search(q: string, object_type?: string, limit?: number): unknown', approx_tokens:95}},
+    { id:'ts_pm', kind:'tool_summary', label:'postMessage', r:13,
+      uri:'tool://slack/postMessage',
+      props:{server:'slack', signature:'postMessage(channel: string, text: string, blocks?: array): unknown', approx_tokens:76}},
+
+    // Turn 2 – Node exec entities
+    { id:'rnode', kind:'runtime_node', label:'Node runtime (T2)', r:16,
+      uri:'runtime://node/turn-2',
+      props:{session_id:'__implicit__', imports:'mcp/gmail, mcp/salesforce', code:'fan-out: listMessages + search', result_tokens:88}},
+    { id:'vmod_gm', kind:'virtual_module', label:'virtual:mcp/gmail', r:12,
+      uri:'virtual:mcp/gmail',
+      props:{exports:'listMessages, sendMessage', generated:'startup', calls_this_session:1}},
+    { id:'vmod_sf', kind:'virtual_module', label:'virtual:mcp/salesforce', r:12,
+      uri:'virtual:mcp/salesforce',
+      props:{exports:'search, getRecord, updateRecord', calls_this_session:1}},
+    { id:'mc_gm', kind:'mcp_client', label:'MCP Client (gmail)', r:15,
+      uri:'mcp-client://gmail',
+      props:{transport:'StdioClientTransport', connected:true, tool_called:'listMessages', args:'{}', response_size:'~14,200 tok raw'}},
+    { id:'mc_sf', kind:'mcp_client', label:'MCP Client (salesforce)', r:15,
+      uri:'mcp-client://salesforce',
+      props:{transport:'StdioClientTransport', connected:true, tool_called:'search', args:'{q:"open deals"}', response_size:'~11,900 tok raw'}},
+    { id:'tc1', kind:'tool_call_rec', label:'listMessages call', r:12,
+      uri:'tool-call://gmail/listMessages',
+      props:{server:'gmail', tool:'listMessages', duration_ms:284, error:undefined, result_kept:false}},
+    { id:'tc2', kind:'tool_call_rec', label:'search (SF) call', r:12,
+      uri:'tool-call://salesforce/search',
+      props:{server:'salesforce', tool:'search', duration_ms:531, error:undefined, result_kept:false}},
+    { id:'er2', kind:'exec_result', label:'ExecResult (T2)', r:15,
+      uri:'exec-result://turn-2',
+      props:{result:'{unread:12, hotLeads:[...], summary:"3 hot deals, 12 unread emails"}', exitCode:0, tool_calls:2, tokens_in_context:88}},
+
+    // Turn 3 – Python exec
+    { id:'rpython', kind:'runtime_python', label:'Python runtime (T3)', r:15,
+      uri:'runtime://python/turn-3',
+      props:{uv:'run --isolated', deps:'pandas>=2.0', tmp_file:'/tmp/mcp-exec-7f3a.py', stateless:true}},
+    { id:'bridge', kind:'bridge', label:'HTTP Bridge', r:16,
+      uri:'bridge://127.0.0.1:49821',
+      props:{port:49821, execId:'b2c3d4e5-...', calls_this_exec:1, flushed_after:'uv exit'}},
+    { id:'er3', kind:'exec_result', label:'ExecResult (T3)', r:15,
+      uri:'exec-result://turn-3',
+      props:{result:'[{week:"2026-W21",emails:47,deals_opened:3},{week:"2026-W20",emails:62,deals_opened:5}]', exitCode:0, tool_calls:0, tokens_in_context:62}},
+
+    // Turn 4 – Bash exec
+    { id:'rbash', kind:'runtime_bash', label:'Bash runtime (T4)', r:14,
+      uri:'runtime://bash/turn-4',
+      props:{code:'curl -X POST https://slack.com/api/chat.postMessage -d ...', env:'SLACK_TOKEN forwarded', stateless:true}},
+    { id:'er4', kind:'exec_result', label:'ExecResult (T4)', r:14,
+      uri:'exec-result://turn-4',
+      props:{result:'{"ok":true,"ts":"1748347200.000001","channel":"C04ABC123"}', exitCode:0, stdout:'{"ok":true,...}', tokens_in_context:22}},
+  ];
+
+  const edges = [
+    // Turn 1 – tools()
+    { source:'claude',   target:'server',   kind:'calls' },
+    { source:'server',   target:'cat',      kind:'searches' },
+    { source:'cat',      target:'ts_lm',    kind:'returns' },
+    { source:'cat',      target:'ts_se',    kind:'returns' },
+    { source:'cat',      target:'ts_pm',    kind:'returns' },
+
+    // Turn 2 – Node exec
+    { source:'claude',   target:'server',   kind:'calls' },
+    { source:'server',   target:'sbox',     kind:'contains' },
+    { source:'sbox',     target:'sess',     kind:'contains' },
+    { source:'sess',     target:'rnode',    kind:'contains' },
+    { source:'rnode',    target:'vmod_gm',  kind:'imports' },
+    { source:'rnode',    target:'vmod_sf',  kind:'imports' },
+    { source:'vmod_gm',  target:'mc_gm',    kind:'calls' },
+    { source:'vmod_sf',  target:'mc_sf',    kind:'calls' },
+    { source:'mc_gm',    target:'tc1',      kind:'records' },
+    { source:'mc_sf',    target:'tc2',      kind:'records' },
+    { source:'rnode',    target:'er2',      kind:'returns' },
+    { source:'er2',      target:'claude',   kind:'returns' },
+
+    // Turn 3 – Python exec
+    { source:'server',   target:'rpython',  kind:'dispatches' },
+    { source:'rpython',  target:'bridge',   kind:'bridges_to' },
+    { source:'bridge',   target:'mc_sf',    kind:'calls' },
+    { source:'rpython',  target:'er3',      kind:'returns' },
+    { source:'er3',      target:'claude',   kind:'returns' },
+
+    // Turn 4 – Bash exec
+    { source:'server',   target:'rbash',    kind:'dispatches' },
+    { source:'rbash',    target:'er4',      kind:'returns' },
+    { source:'er4',      target:'claude',   kind:'returns' },
+  ];
+
+  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+  // Seed positions loosely
+  const seed = {
+    claude:[W/2,H/2], server:[W/2-100,H/2-40], sbox:[W/2+60,H/2+60],
+    cat:[W/2-220,H/2-140], ts_lm:[W/2-380,H/2-180], ts_se:[W/2-280,H/2-220], ts_pm:[W/2-170,H/2-240],
+    sess:[W/2+160,H/2], rnode:[W/2+260,H/2-80], vmod_gm:[W/2+380,H/2-160], vmod_sf:[W/2+400,H/2-60],
+    mc_gm:[W/2+520,H/2-200], mc_sf:[W/2+540,H/2-40], tc1:[W/2+480,H/2-300], tc2:[W/2+560,H/2+80],
+    er2:[W/2+200,H/2+160], bridge:[W/2+100,H/2+220], rpython:[W/2-60,H/2+200],
+    er3:[W/2-220,H/2+240], rbash:[W/2-340,H/2+140], er4:[W/2-400,H/2+60],
+  };
+  nodes.forEach(n => { n.x = seed[n.id]?.[0] ?? W/2; n.y = seed[n.id]?.[1] ?? H/2; });
+
+  const gRoot = svg.append('g');
+  const gEdges = gRoot.append('g');
+  const gNodes = gRoot.append('g');
+
+  // Draw edges
+  edges.forEach(e => {
+    const ek = EK[e.kind] ?? {color:'#475569', dash:''};
+    const src = nodeMap[e.source], tgt = nodeMap[e.target];
+    if (!src || !tgt) return;
+    gEdges.append('line')
+      .attr('class', `edge-${e.source}-${e.target}`)
+      .attr('stroke', ek.color).attr('stroke-width', 1.2)
+      .attr('stroke-dasharray', ek.dash || null)
+      .attr('stroke-opacity', 0.6)
+      .attr('marker-end', `url(#arrow-${e.kind})`);
+  });
+
+  // Draw nodes
+  const nodeGroups = {};
+  nodes.forEach(n => {
+    const color = NK[n.kind] ?? '#475569';
+    const icon  = NI[n.kind] ?? '◉';
+    const ng = gNodes.append('g').style('cursor','pointer');
+    ng.append('circle').attr('r', n.r+6).attr('fill',color).attr('opacity',0.15);
+    const circle = ng.append('circle').attr('r',n.r).attr('fill',color);
+    ng.append('text').attr('text-anchor','middle').attr('dy','0.35em')
+      .attr('fill','#fff').attr('font-size', Math.max(8, n.r*0.6)).attr('font-family','monospace').text(icon);
+    ng.append('text').attr('y',n.r+13).attr('text-anchor','middle')
+      .attr('fill','#7a9ab8').attr('font-size',8).text(n.label);
+    ng.on('mouseover', () => circle.attr('r',n.r+3));
+    ng.on('mouseout',  () => circle.attr('r',n.r));
+    ng.on('click', () => openPropPanel(n));
+    nodeGroups[n.id] = ng;
+  });
+
+  // Force simulation
+  const simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(edges).id(d=>d.id).distance(90).strength(0.4))
+    .force('charge', d3.forceManyBody().strength(-280))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collision', d3.forceCollide(d=>d.r+20))
+    .on('tick', ticked);
+
+  function ticked() {
+    nodes.forEach(n => {
+      n.x = Math.max(n.r+10, Math.min(W-n.r-10, n.x));
+      n.y = Math.max(n.r+10, Math.min(H-n.r-30, n.y));
+      nodeGroups[n.id].attr('transform', `translate(${n.x},${n.y})`);
+    });
+    // Update edge positions
+    edges.forEach(e => {
+      const src = nodeMap[e.source], tgt = nodeMap[e.target];
+      if (!src || !tgt) return;
+      const dx=tgt.x-src.x, dy=tgt.y-src.y, len=Math.hypot(dx, dy)||1;
+      const ux=dx/len, uy=dy/len;
+      const sr=src.r+8, tr=tgt.r+8;
+      gEdges.selectAll(`.edge-${e.source}-${e.target}`)
+        .attr('x1', src.x+ux*sr).attr('y1', src.y+uy*sr)
+        .attr('x2', tgt.x-ux*tr).attr('y2', tgt.y-uy*tr);
+    });
+  }
+
+  // Drag behavior
+  nodes.forEach(n => {
+    nodeGroups[n.id].call(d3.drag()
+      .on('start', (event) => { if (!event.active) { simulation.alphaTarget(0.3).restart(); } n.fx=n.x; n.fy=n.y; })
+      .on('drag',  (event) => { n.fx=event.x; n.fy=event.y; })
+      .on('end',   (event) => { if (!event.active) { simulation.alphaTarget(0); } n.fx=null; n.fy=null; })
+    );
+  });
+
+  // Zoom
+  svg.call(d3.zoom()
+    .scaleExtent([0.3, 3])
+    .on('zoom', event => gRoot.attr('transform', event.transform))
+  );
+
+  document.getElementById('convo-fit').addEventListener('click', () => {
+    simulation.alpha(0.3).restart();
+    svg.transition().duration(600).call(
+      d3.zoom().transform,
+      d3.zoomIdentity.translate(W/2, H/2).scale(0.85).translate(-W/2, -H/2)
+    );
+  });
+})();
+
+// ─── NAV ACTIVE STATE ────────────────────────────────────────────────────────
+
+(function initNav() {
+  const links = document.querySelectorAll('.nav-link');
+  const sections = [...links].map(l => {
+    const id = l.getAttribute('href').slice(1);
+    return { link: l, el: document.getElementById(id) };
+  }).filter(x => x.el);
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = sections.find(s => s.el === entry.target);
+        if (active) active.link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+
+  sections.forEach(s => obs.observe(s.el));
+})();
+</script>
+</body>
+</html>

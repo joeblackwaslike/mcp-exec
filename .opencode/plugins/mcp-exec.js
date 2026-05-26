@@ -17,6 +17,8 @@ const extractBody = (content) => {
   return match ? match[1] : content;
 };
 
+const DOCS_URL = 'https://joeblackwaslike.github.io/mcp-exec/';
+
 const getBootstrap = () => {
   const skillPath = path.join(skillsDir, 'using-mcp-exec', 'SKILL.md');
   if (!fs.existsSync(skillPath)) return null;
@@ -28,6 +30,8 @@ You have access to mcp-exec tools: \`tools(query)\` (search MCP catalog) and \`e
 ${body}
 
 **Tool mapping for OpenCode:** Use your native file/shell tools inside exec(). The \`skill\` tool loads mcp-exec skills by name.
+
+**Docs:** ${DOCS_URL} — Guide, Manual, Developer, Reference
 </IMPORTANT>`;
 };
 

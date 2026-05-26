@@ -26,9 +26,9 @@
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
-    "docs:dev": "vitepress dev site",
-    "docs:build": "vitepress build site",
-    "docs:preview": "vitepress preview site"
+    "docs:dev": "docusaurus start website",
+    "docs:build": "docusaurus build website",
+    "docs:preview": "docusaurus serve website"
   },
   "lint-staged": {
     "*.{ts,js,json}": "biome check --write --unsafe --no-errors-on-unmatched"
