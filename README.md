@@ -612,10 +612,19 @@ if (typeof result === 'object' && result !== null && 'error' in result) {
 
 The sandbox enforces restrictions at the OS level via `@anthropic-ai/sandbox-runtime`. All child processes inherit them — no language-level bypass exists.
 
-**v0.1 known limitations** (tracked in [#3](https://github.com/joeblackwaslike/mcp-exec/issues/3)):
+**Environment variable allowlist** (resolved in v0.3, see [#3](https://github.com/joeblackwaslike/mcp-exec/issues/3)):
 
-- Bash runtime inherits the full process environment. Env var filtering is planned.
-- Auth for downstream MCP servers works via env vars present in your shell — all credentials are in scope for the session lifetime.
+By default, only a safe minimal set of env vars passes through to Bash and Python subprocesses: `PATH`, `HOME`, `TMPDIR`, `TMP`, `TEMP`, `USER`, `USERNAME`, `LANG`, `LC_ALL`, `LC_CTYPE`, `NODE_PATH`, `SHELL`. Everything else — API keys, tokens, credentials — is stripped before the child process spawns.
+
+To allow additional vars (e.g. for MCP servers that read auth from the environment):
+
+```sh
+mcp-exec env add MY_API_KEY          # add to ~/.claude/settings.json
+mcp-exec env add MY_API_KEY --local  # add to .claude/settings.json (project-level)
+mcp-exec env list                    # show what passes through vs what's blocked
+```
+
+Node runtime uses `vm.Context` and does not spawn a subprocess, so its env exposure is limited to the parent process scope.
 
 ## Plugin compatibility
 
