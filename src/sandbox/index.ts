@@ -1,6 +1,7 @@
 import type { BridgeServer } from '../bridge/server.js';
 import type { ToolRef } from '../catalog/builder.js';
 import type { ExecResult, RuntimeParam } from '../types.js';
+import { resolveSandboxConfig } from './config.js';
 import { runInBash } from './runtimes/bash.js';
 import { runInNode } from './runtimes/node.js';
 import { runInPython } from './runtimes/python.js';
@@ -47,6 +48,8 @@ export function createExecDispatcher(
 ) {
   const shimClients = wrapClients(mcpClients);
 
+  const allowedEnv = resolveSandboxConfig().env?.allow;
+
   return async function exec(opts: ExecOptions): Promise<ExecResult> {
     const { code, runtime, session_id } = opts;
     const type = typeof runtime === 'string' ? runtime : runtime.type;
@@ -59,11 +62,11 @@ export function createExecDispatcher(
     }
 
     if (type === 'bash') {
-      return runInBash(code, { timeout, env });
+      return runInBash(code, { timeout, env, allowedEnv });
     }
 
     if (type === 'python') {
-      return runInPython(code, { timeout, env, bridge, toolsByServer });
+      return runInPython(code, { timeout, env, allowedEnv, bridge, toolsByServer });
     }
 
     throw new Error(`Unsupported runtime: ${type}`);

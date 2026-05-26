@@ -2,6 +2,21 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
+export const DEFAULT_ENV_ALLOW = [
+  'PATH',
+  'HOME',
+  'TMPDIR',
+  'TMP',
+  'TEMP',
+  'USER',
+  'USERNAME',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'NODE_PATH',
+  'SHELL',
+];
+
 interface SandboxRuntimeConfig {
   network?: { allowedDomains?: string[] };
   filesystem?: {
@@ -10,6 +25,7 @@ interface SandboxRuntimeConfig {
     denyWrite?: string[];
     allowRead?: string[];
   };
+  env?: { allow: string[] };
 }
 
 interface CcSandboxBlock {
@@ -20,6 +36,7 @@ interface CcSandboxBlock {
     denyWrite?: string[];
     allowRead?: string[];
   };
+  env?: { allow?: string[] };
 }
 
 function readSandboxBlock(settingsPath: string): CcSandboxBlock {
@@ -48,6 +65,8 @@ export function resolveSandboxConfig(cwd = process.cwd()): SandboxRuntimeConfig 
   const user = readSandboxBlock(userSettings);
   const project = readSandboxBlock(projectSettings);
 
+  const configuredAllow = mergeArrays(user.env?.allow, project.env?.allow);
+
   return {
     network: {
       allowedDomains: mergeArrays(user.network?.allowedDomains, project.network?.allowedDomains),
@@ -60,5 +79,21 @@ export function resolveSandboxConfig(cwd = process.cwd()): SandboxRuntimeConfig 
       denyWrite: mergeArrays(user.filesystem?.denyWrite, project.filesystem?.denyWrite),
       allowRead: mergeArrays(user.filesystem?.allowRead, project.filesystem?.allowRead),
     },
+    env: {
+      allow: configuredAllow.length > 0 ? configuredAllow : DEFAULT_ENV_ALLOW,
+    },
   };
+}
+
+/** Filters process.env down to only the allowed variable names. */
+export function filterEnv(
+  env: NodeJS.ProcessEnv,
+  allow: string[],
+  extra?: Record<string, string>,
+): Record<string, string> {
+  const filtered: Record<string, string> = {};
+  for (const key of allow) {
+    if (env[key] != null) filtered[key] = env[key] as string;
+  }
+  return { ...filtered, ...extra };
 }

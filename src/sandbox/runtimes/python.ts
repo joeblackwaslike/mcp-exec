@@ -7,10 +7,12 @@ import { generateMcpPackage, removeMcpPackage } from '../../bridge/package-gener
 import type { BridgeServer } from '../../bridge/server.js';
 import type { ToolRef } from '../../catalog/builder.js';
 import type { ExecResult } from '../../types.js';
+import { filterEnv } from '../config.js';
 
 interface PythonOpts {
   timeout?: number;
   env?: Record<string, string>;
+  allowedEnv?: string[];
   bridge?: BridgeServer;
   toolsByServer?: Record<string, ToolRef[]>;
   execId?: string;
@@ -48,14 +50,15 @@ export async function runInPython(code: string, opts: PythonOpts = {}): Promise<
 
 function spawnPython(
   scriptPath: string,
-  opts: { timeout?: number; env?: Record<string, string> },
+  opts: { timeout?: number; env?: Record<string, string>; allowedEnv?: string[] },
 ): Promise<ExecResult> {
   return new Promise((resolve) => {
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
 
+    const baseEnv = opts.allowedEnv ? filterEnv(process.env, opts.allowedEnv) : process.env;
     const child = spawn('uv', ['run', '--isolated', scriptPath], {
-      env: { ...process.env, ...opts.env },
+      env: { ...baseEnv, ...opts.env },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
