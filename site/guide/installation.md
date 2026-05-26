@@ -24,8 +24,8 @@ claude plugin install mcp-exec
 Then prime your CLAUDE.md so the model knows when to use it:
 
 ```sh
-npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill          # global (~/.claude/CLAUDE.md)
-npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill --local  # project-level (./CLAUDE.md)
+mcp-exec prime          # global (~/.claude/CLAUDE.md)
+mcp-exec prime --local  # project-level (.claude/CLAUDE.md)
 ```
 
 > **Why prime?** Skills activate ~40% of the time from the skills directory alone. Priming adds a trigger rule to CLAUDE.md that brings reliability to ~90–95%. It's idempotent — safe to run more than once.
@@ -48,8 +48,8 @@ npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill --local  # project
 **2. Prime your CLAUDE.md:**
 
 ```sh
-npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill          # global (~/.claude/CLAUDE.md)
-npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill --local  # project-level (./CLAUDE.md)
+mcp-exec prime          # global (~/.claude/CLAUDE.md)
+mcp-exec prime --local  # project-level (.claude/CLAUDE.md)
 ```
 
 == Cursor
