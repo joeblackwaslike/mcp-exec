@@ -36,6 +36,7 @@ const sidebars: SidebarsConfig = {
         'developer/observability',
         'developer/codex-sandboxing',
         'developer/gemini-sandboxing',
+        'developer/cursor-sandboxing',
         'developer/agent-plugins',
       ],
     },

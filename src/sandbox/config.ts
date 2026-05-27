@@ -215,6 +215,44 @@ export function isGeminiRuntime(): boolean {
   return process.env.MCP_EXEC_RUNTIME === 'gemini';
 }
 
+/**
+ * Reads sandbox config from ~/.cursor/srt-settings.json (user) and
+ * .cursor/srt-settings.json (project).
+ * Used when mcp-exec is running under Cursor, which provides no native MCP sandbox.
+ * Format is identical to SandboxRuntimeConfig (top-level, not nested under "sandbox").
+ */
+export function resolveCursorConfig(cwd = process.cwd()): SandboxRuntimeConfig {
+  const userSettings = join(homedir(), '.cursor', 'srt-settings.json');
+  const projectSettings = join(cwd, '.cursor', 'srt-settings.json');
+
+  const user = readSandboxBlock(userSettings, false);
+  const project = readSandboxBlock(projectSettings, false);
+
+  const configuredAllow = mergeArrays(user.env?.allow, project.env?.allow);
+
+  return {
+    network: {
+      allowedDomains: mergeArrays(user.network?.allowedDomains, project.network?.allowedDomains),
+    },
+    filesystem: {
+      allowWrite: mergeArrays(user.filesystem?.allowWrite, project.filesystem?.allowWrite, [
+        '~/.mcp-exec/sessions',
+      ]),
+      denyRead: mergeArrays(user.filesystem?.denyRead, project.filesystem?.denyRead),
+      denyWrite: mergeArrays(user.filesystem?.denyWrite, project.filesystem?.denyWrite),
+      allowRead: mergeArrays(user.filesystem?.allowRead, project.filesystem?.allowRead),
+    },
+    env: {
+      allow: configuredAllow.length > 0 ? configuredAllow : DEFAULT_ENV_ALLOW,
+    },
+  };
+}
+
+/** Returns true when mcp-exec is running under Cursor. */
+export function isCursorRuntime(): boolean {
+  return process.env.MCP_EXEC_RUNTIME === 'cursor';
+}
+
 /** Filters process.env down to only the allowed variable names. */
 export function filterEnv(
   env: NodeJS.ProcessEnv,

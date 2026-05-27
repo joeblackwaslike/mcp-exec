@@ -9,9 +9,11 @@ import { searchTools, setCatalog } from './catalog/index.js';
 import { connectMcpClients, readMcpConfig } from './mcp-clients/index.js';
 import {
   isCodexRuntime,
+  isCursorRuntime,
   isGeminiRuntime,
   isOpenCodeRuntime,
   resolveCodexConfig,
+  resolveCursorConfig,
   resolveGeminiConfig,
   resolveOpenCodeConfig,
   resolveSandboxConfig,
@@ -20,38 +22,11 @@ import { createExecDispatcher } from './sandbox/index.js';
 import { SessionManager } from './sandbox/session.js';
 import type { RuntimeParam } from './types.js';
 
-async function initializeSandbox(): Promise<void> {
-  if (isCodexRuntime()) {
-    // Codex provides native OS-level sandboxing (Seatbelt on macOS, bubblewrap on Linux).
-    // SRT is not initialized; read config.toml only for diagnostic logging.
-    const codexConfig = resolveCodexConfig();
-    const modeNote = codexConfig.sandboxMode ? ` (${codexConfig.sandboxMode} mode)` : '';
-    process.stderr.write(
-      `[mcp-exec] Codex native sandbox detected${modeNote} — SRT initialization skipped\n`,
-    );
-    return;
-  }
-
-  if (isGeminiRuntime()) {
-    // Gemini provides opt-in native sandboxing (Seatbelt, bwrap, gVisor, Docker).
-    // SRT is not initialized; GEMINI_SANDBOX / settings.json checked for diagnostics.
-    const geminiConfig = resolveGeminiConfig();
-    if (geminiConfig.sandboxEnabled) {
-      process.stderr.write(
-        `[mcp-exec] Gemini native sandbox active (${geminiConfig.sandboxType}) — SRT initialization skipped\n`,
-      );
-    } else {
-      process.stderr.write(
-        '[mcp-exec] Gemini runtime detected, no sandbox active — SRT skipped; enable GEMINI_SANDBOX for isolation\n',
-      );
-    }
-    return;
-  }
-
-  const isOpenCode = isOpenCodeRuntime();
-  const sandboxConfig = isOpenCode ? resolveOpenCodeConfig() : resolveSandboxConfig();
-  const configSource = isOpenCode ? '~/.srt-settings.json' : 'settings.json';
-
+async function initializeSrt(
+  // biome-ignore lint/suspicious/noExplicitAny: SandboxRuntimeConfig shape doesn't match srt internal type
+  sandboxConfig: any,
+  configSource: string,
+): Promise<void> {
   const hasSandboxBlock =
     (sandboxConfig.network?.allowedDomains?.length ?? 0) > 0 ||
     (sandboxConfig.filesystem?.allowWrite?.length ?? 1) > 1;
@@ -63,12 +38,43 @@ async function initializeSandbox(): Promise<void> {
   }
 
   try {
-    // biome-ignore lint/suspicious/noExplicitAny: SandboxRuntimeConfig shape doesn't match srt internal type
-    await SandboxManager.initialize(sandboxConfig as any);
+    await SandboxManager.initialize(sandboxConfig);
   } catch (err) {
     process.stderr.write(`[mcp-exec] Fatal: sandbox initialization failed: ${err}\n`);
     process.exit(1);
   }
+}
+
+async function initializeSandbox(): Promise<void> {
+  if (isCodexRuntime()) {
+    const codexConfig = resolveCodexConfig();
+    const modeNote = codexConfig.sandboxMode ? ` (${codexConfig.sandboxMode} mode)` : '';
+    process.stderr.write(
+      `[mcp-exec] Codex native sandbox detected${modeNote} — SRT initialization skipped\n`,
+    );
+    return;
+  }
+
+  if (isGeminiRuntime()) {
+    const geminiConfig = resolveGeminiConfig();
+    const msg = geminiConfig.sandboxEnabled
+      ? `[mcp-exec] Gemini native sandbox active (${geminiConfig.sandboxType}) — SRT initialization skipped\n`
+      : '[mcp-exec] Gemini runtime detected, no sandbox active — SRT skipped; enable GEMINI_SANDBOX for isolation\n';
+    process.stderr.write(msg);
+    return;
+  }
+
+  if (isCursorRuntime()) {
+    await initializeSrt(resolveCursorConfig(), '~/.cursor/srt-settings.json');
+    return;
+  }
+
+  if (isOpenCodeRuntime()) {
+    await initializeSrt(resolveOpenCodeConfig(), '~/.srt-settings.json');
+    return;
+  }
+
+  await initializeSrt(resolveSandboxConfig(), 'settings.json');
 }
 
 async function main() {

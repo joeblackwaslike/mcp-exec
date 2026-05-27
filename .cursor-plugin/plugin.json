@@ -1,0 +1,21 @@
+{
+  "name": "mcp-exec",
+  "version": "1.0.0",
+  "description": "Sandboxed code execution — keep intermediate MCP results out of the context window. Provides tools() for MCP catalog search and exec() for sandboxed Node/Bash/Python execution.",
+  "author": { "name": "Joe Black" },
+  "homepage": "https://joeblackwaslike.github.io/mcp-exec/",
+  "repository": "https://github.com/joeblackwaslike/mcp-exec",
+  "license": "MIT",
+  "keywords": ["mcp", "sandbox", "execution", "context-window", "token-reduction"],
+  "skills": "./skills/",
+  "rules": ".cursor/rules/",
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"],
+      "env": {
+        "MCP_EXEC_RUNTIME": "cursor"
+      }
+    }
+  }
+}

@@ -233,6 +233,58 @@ See the [Gemini Sandboxing reference](/docs/developer/gemini-sandboxing) for ful
 
 ---
 
+## Cursor
+
+**Plugin manifest:** `.cursor-plugin/plugin.json`
+
+### Install
+
+Copy the plugin to your Cursor plugins directory:
+
+```sh
+cp -r .cursor-plugin/ ~/.cursor/plugins/mcp-exec/
+```
+
+Or add the MCP server manually to `~/.cursor/mcp.json`:
+
+```json title="~/.cursor/mcp.json"
+{
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"],
+      "env": { "MCP_EXEC_RUNTIME": "cursor" }
+    }
+  }
+}
+```
+
+A project-level `.cursor/mcp.json` takes precedence over the global config.
+
+### Skills
+
+The plugin manifest declares `"skills": "./skills/"` for on-demand skill discovery. An always-on rule at `.cursor/rules/mcp-exec.mdc` (registered via `"rules": ".cursor/rules/"`) loads activation context into every session with `alwaysApply: true`. Install it manually for project-scoped activation:
+
+```sh
+cp .cursor/rules/mcp-exec.mdc .cursor/rules/
+```
+
+### Sandbox
+
+Cursor provides **no native MCP sandbox** — MCP servers run with full Cursor process permissions. mcp-exec uses SRT and reads from `~/.cursor/srt-settings.json`:
+
+```json title="~/.cursor/srt-settings.json"
+{
+  "network": { "allowedDomains": ["api.github.com"] },
+  "filesystem": { "allowWrite": ["/tmp"], "denyRead": ["~/.ssh"] },
+  "env": { "allow": ["PATH", "HOME", "TMPDIR", "USER"] }
+}
+```
+
+Project overrides go in `.cursor/srt-settings.json` at the project root. See the [Cursor Sandboxing reference](/docs/developer/cursor-sandboxing) for full details.
+
+---
+
 ## Summary: Skills Wiring Per Agent
 
 | Agent | Skills mechanism | Auto or manual |
@@ -240,7 +292,8 @@ See the [Gemini Sandboxing reference](/docs/developer/gemini-sandboxing) for ful
 | Claude Code | `skills/` dir in plugin manifest + `mcp-exec-prime-skill` primes CLAUDE.md | Auto-discover; prime command recommended |
 | OpenCode | `config.skills.paths` in plugin hook + bootstrap injection in every conversation | Fully automatic |
 | Codex CLI | `skills/` field in plugin manifest | Fully automatic |
-| Gemini CLI | `@./skills/...` in GEMINI.md | Automatic at session start |
+| Gemini CLI | `contextFileName: GEMINI.md` + `skills/` in extension | Fully automatic |
+| Cursor | `skills/` in plugin manifest + `alwaysApply` rule in `.cursor/rules/` | Fully automatic via plugin |
 
 ## Adding a New Agent
 

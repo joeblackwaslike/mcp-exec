@@ -1,0 +1,67 @@
+---
+alwaysApply: true
+description: "mcp-exec tools — when and how to use tools() and exec() to keep MCP results out of the context window"
+---
+
+# mcp-exec
+
+You have two MCP tools from the `mcp-exec` server:
+
+- **`tools(query)`** — search connected MCP servers for available tools. Returns trimmed summaries `{ server, name, description, signature }`. Full schemas never enter context. Use `"*"` to list all tools.
+- **`exec(code, runtime)`** — run code in a sandboxed environment (Node/Bash/Python). Only the final return value or stdout enters context — all intermediate data stays in the sandbox.
+
+## When to use exec()
+
+Use `exec()` instead of calling an MCP tool directly when:
+
+- The result would be large (record lists, API responses, file contents, search results)
+- You want to filter, transform, or summarize before the output enters context
+- The workflow touches 2+ tools and intermediate results should stay out of context
+- A single tool call returns more data than you need — extract only the relevant fields
+
+The single-tool case matters: one MCP call returning 200 records costs ~8,000 tokens in context; `exec()` can reduce it to a 50-token summary.
+
+## Import syntax (inside exec)
+
+```typescript
+import { toolName } from 'mcp/server-name';
+```
+
+Server names match keys in `.cursor/mcp.json`. Imports resolve at runtime.
+
+## Quick examples
+
+```typescript
+// Discover tools
+tools("search emails")
+tools("github pull request")
+tools("*")  // list all
+
+// Single large result — keep out of context
+exec({
+  runtime: "node",
+  code: `
+    import { searchEmails } from 'mcp/gmail';
+    const emails = await searchEmails({ query: 'is:unread' });
+    return { count: emails.length, subjects: emails.slice(0, 3).map(e => e.subject) };
+  `
+})
+
+// Multi-step workflow
+exec({
+  runtime: "node",
+  code: `
+    import { listPRs } from 'mcp/github';
+    import { searchEmails } from 'mcp/gmail';
+    const prs = await listPRs({ state: 'open' });
+    const urgent = await searchEmails({ query: 'subject:urgent' });
+    return { open_prs: prs.length, urgent_emails: urgent.length };
+  `
+})
+```
+
+## Call directly (no exec) when
+
+- The result is small and you need to reason over raw output
+- A `PreToolUse`/`PostToolUse` hook must fire for that specific tool call
+- Interactive debugging where the user needs to see intermediate state
