@@ -1,240 +1,132 @@
 ---
 sidebar_position: 4
-description: "How mcp-exec integrates with Codex CLI's platform-native sandboxing — dual layers, configuration, and troubleshooting."
+description: "How mcp-exec integrates with Codex CLI's platform-native sandboxing — detection, configuration, and troubleshooting."
 ---
 
 # Codex CLI Sandboxing
 
-## Overview
+## How It Works
 
-When mcp-exec runs under Codex CLI, two independent sandboxing layers are active simultaneously. Understanding how they interact is necessary to configure network and filesystem access correctly.
-
-**Codex's platform sandbox** wraps the entire mcp-exec server process. It is enforced at the OS level by Codex itself, using different mechanisms per platform.
-
-**mcp-exec's srt sandbox** wraps code running inside individual `exec()` calls. It is configured via your `.claude/settings.json` files and enforced by `@anthropic-ai/sandbox-runtime`.
-
-These layers are independent and additive. Code inside `exec()` is sandboxed twice. A resource must be permitted by both layers to be accessible.
-
-## Platform Sandbox Mechanisms
-
-Codex uses different OS primitives depending on the host platform:
-
-| Platform | Mechanism | Notes |
-|---|---|---|
-| macOS | macOS Seatbelt (`sandbox-exec`) | Built into the OS, no installation needed |
-| Linux | bubblewrap (`bwrap`) | Install via distro package manager; Codex falls back to a bundled helper if `bwrap` not found, but unprivileged user namespace support is required |
-| WSL2 | bubblewrap (`bwrap`) in WSL2 | Same as Linux; ensure `bwrap` is available in the WSL2 distro |
-| Windows (native) | Windows Sandbox (PowerShell) | Codex manages this directly |
-
-mcp-exec has no visibility into which mechanism Codex is using. It cannot detect the active platform sandbox type or auto-adjust its configuration in response.
-
-## Sandbox Layer Configuration
+When mcp-exec detects it is running under Codex CLI (`MCP_EXEC_RUNTIME=codex`), it skips SRT initialization entirely. Codex provides its own platform-native sandbox that wraps the entire mcp-exec server process, so a second sandbox layer would be redundant and could cause initialization failures.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  Codex platform sandbox                                        │
-│  (macOS Seatbelt / bwrap / Windows Sandbox)                    │
-│  Configured by: Codex CLI settings                             │
-│                                                                │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  mcp-exec srt sandbox                                    │  │
-│  │  Configured by: ~/.claude/settings.json +                │  │
-│  │                 .claude/settings.json (project)          │  │
-│  │                                                          │  │
-│  │  ┌────────────────────────────────────────────────────┐  │  │
-│  │  │  exec() code                                       │  │  │
-│  │  │  (Node: also inside vm.Context)                    │  │  │
-│  │  └────────────────────────────────────────────────────┘  │  │
-│  └──────────────────────────────────────────────────────────┘  │
+│  (macOS Seatbelt / Linux bwrap / Windows Sandbox)             │
+│  Configured by: ~/.codex/config.toml                          │
+│                                                               │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │  mcp-exec process                                       │  │
+│  │  SRT: not initialized                                   │  │
+│  │                                                         │  │
+│  │  ┌───────────────────────────────────────────────────┐  │  │
+│  │  │  exec() code                                      │  │  │
+│  │  │  (Node: inside vm.Context)                        │  │  │
+│  │  │  (Bash/Python: subprocess with filtered env)      │  │  │
+│  │  └───────────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────┘
 ```
 
-**Codex's sandbox** — managed by Codex. Configure via Codex's own settings. mcp-exec has no config interface for this layer.
+mcp-exec still applies its own application-level filters inside `exec()` — env var filtering (`DEFAULT_ENV_ALLOW`) and vm.Context isolation for Node — but it does not initialize SRT. The OS-level enforcement is Codex's responsibility.
 
-**mcp-exec's srt sandbox** — managed by mcp-exec. Configure via the `sandbox` block in `~/.claude/settings.json` (user-scope) and `.claude/settings.json` (project-scope). These paths are the same regardless of which agent (CC or Codex) is running mcp-exec.
+## Platform Sandbox Mechanisms
 
-No Codex-specific config file is needed for mcp-exec's inner sandbox.
+Codex uses different OS primitives per platform:
 
-## Configuration Reference
-
-### mcp-exec sandbox config (settings.json)
-
-```json
-{
-  "sandbox": {
-    "network": {
-      "allowedDomains": [
-        "api.github.com",
-        "gmail.googleapis.com",
-        "*.example.com"
-      ]
-    },
-    "filesystem": {
-      "allowWrite": [
-        "~/.mcp-exec/sessions",
-        "/tmp"
-      ],
-      "denyRead": [
-        "~/.ssh",
-        "~/.aws"
-      ],
-      "denyWrite": [
-        "~"
-      ]
-    },
-    "env": {
-      "allow": [
-        "PATH", "HOME", "TMPDIR", "USER",
-        "GITHUB_TOKEN", "GOOGLE_API_KEY"
-      ]
-    }
-  }
-}
-```
-
-User-scope (`~/.claude/settings.json`) and project-scope (`.claude/settings.json`) are merged: array fields are unioned (deduped), so you can layer global and per-project policies without one overwriting the other.
-
-`~/.mcp-exec/sessions` and `/tmp` are always included in `allowWrite` — they are injected by mcp-exec regardless of what your config specifies.
-
-### Configuration matrix: access control
-
-For a given resource, access is granted only if **both** layers permit it. If either layer denies, the call fails.
-
-| Resource | Controlled by | Config location |
+| Platform | Mechanism | Notes |
 |---|---|---|
-| Network — allowed domains inside exec() | mcp-exec srt sandbox | `sandbox.network.allowedDomains` in settings.json |
-| Network — overall process network access | Codex platform sandbox | Codex settings |
-| Filesystem writes inside exec() | mcp-exec srt sandbox | `sandbox.filesystem.allowWrite` in settings.json |
-| Filesystem writes by mcp-exec process | Codex platform sandbox | Codex settings |
-| Env vars visible inside exec() | mcp-exec srt sandbox | `sandbox.env.allow` in settings.json |
-| Codex agent's own env | Codex platform sandbox | Codex settings |
+| macOS | macOS Seatbelt (`sandbox-exec`) | Built into the OS, no installation needed |
+| Linux | bubblewrap (`bwrap`) | `sudo apt install bubblewrap` (Ubuntu) / `sudo dnf install bubblewrap` (Fedora) |
+| WSL2 | bubblewrap (`bwrap`) in WSL2 | Same as Linux; ensure `bwrap` is available in the WSL2 distro |
+| Windows (native) | Windows Sandbox (PowerShell) | Codex manages this directly |
 
-## Network Access
+## Detection: `MCP_EXEC_RUNTIME=codex`
 
-Network calls inside `exec()` must satisfy both layers:
-
-1. The target domain must be in mcp-exec's `sandbox.network.allowedDomains`.
-2. The Codex platform sandbox must permit network access to that domain.
-
-If a domain is in mcp-exec's allowlist but blocked by Codex's platform sandbox, the call will fail at the OS level. The error will typically appear as a connection refused or DNS resolution failure, not as an mcp-exec error.
-
-**Example** — a call to `api.github.com` fails unexpectedly:
+mcp-exec detects the Codex runtime via the `MCP_EXEC_RUNTIME` environment variable. When it equals `"codex"`, SRT initialization is skipped and a startup message is logged:
 
 ```
-# Check 1: is the domain in mcp-exec's allowlist?
-# ~/.claude/settings.json or .claude/settings.json must have:
-"sandbox": { "network": { "allowedDomains": ["api.github.com"] } }
-
-# Check 2: does Codex's sandbox permit that network access?
-# Refer to Codex CLI documentation for configuring allowed domains
-# in its platform sandbox.
+[mcp-exec] Codex native sandbox detected (workspace-write mode) — SRT initialization skipped
 ```
 
-If both are configured but calls still fail, see the troubleshooting section below.
+The mode annotation (`workspace-write mode`) is read from `sandbox_mode` in your `~/.codex/config.toml`. If no config.toml is found or `sandbox_mode` is absent, the mode annotation is omitted.
 
-## Filesystem Access
+This env var is set automatically when you register mcp-exec via the plugin manifest. Add it to your Codex `config.toml` MCP server entry if you register mcp-exec manually:
 
-The same double-layer rule applies to filesystem writes. `allowWrite` paths in mcp-exec's config must also be within the paths Codex's platform sandbox allows the mcp-exec process to write.
+```toml title="~/.codex/config.toml"
+[mcp_servers.mcp-exec]
+command = "npx"
+args = ["@joeblackwaslike2/mcp-exec"]
 
-`/tmp` and `~/.mcp-exec/sessions` are always in mcp-exec's `allowWrite`. They are also typically permitted by Codex's sandbox. If writes to these paths fail, the issue is at the Codex layer.
-
-For project-specific paths (e.g. writing output files to the working directory), both layers must agree:
-
-```json
-// .claude/settings.json (project-scope)
-{
-  "sandbox": {
-    "filesystem": {
-      "allowWrite": ["./output", "./.cache"]
-    }
-  }
-}
+[mcp_servers.mcp-exec.env]
+MCP_EXEC_RUNTIME = "codex"
 ```
 
-And the equivalent path must be accessible to the mcp-exec process in Codex's sandbox.
+## Configuration
 
-## Known Limitations (v1.0)
+Codex's sandbox is configured in `~/.codex/config.toml` (user-scope) and `.codex/config.toml` (project-scope). The sandbox-relevant keys:
 
-- mcp-exec cannot detect which Codex platform sandbox mode is active.
-- No automatic adjustment of mcp-exec's sandbox config based on the platform sandbox type.
-- Users on Linux/WSL2 should verify that `bwrap` is installed and that unprivileged user namespaces are enabled for full Codex sandbox enforcement.
-- Future versions may add support for reading from `.codex/settings.json` to allow agent-specific sandbox policies without affecting the CC settings.json.
+| Key | Values | Default |
+|---|---|---|
+| `sandbox_mode` | `read-only`, `workspace-write`, `danger-full-access` | `workspace-write` |
+| `approval_policy` | `untrusted`, `on-request`, `never` | `on-request` |
+| `sandbox_workspace_write.writable_roots` | list of paths | workspace directory |
+
+mcp-exec reads `sandbox_mode` and `writable_roots` for diagnostic logging at startup. It does not pass them to SRT (SRT is not initialized). Codex enforces these settings directly via the OS sandbox.
+
+### Example config.toml
+
+```toml title="~/.codex/config.toml"
+sandbox_mode = "workspace-write"
+approval_policy = "on-request"
+
+[mcp_servers.mcp-exec]
+command = "npx"
+args = ["@joeblackwaslike2/mcp-exec"]
+
+[mcp_servers.mcp-exec.env]
+MCP_EXEC_RUNTIME = "codex"
+```
+
+## Running Under Claude Code vs Codex
+
+The same mcp-exec binary handles both agents. The runtime flag determines the sandbox path:
+
+| Scenario | Env var | SRT initialized | Sandbox enforced by |
+| --- | --- | --- | --- |
+| Claude Code | *(absent)* | Yes | SRT + `~/.claude/settings.json` |
+| Codex CLI | `MCP_EXEC_RUNTIME=codex` | No | Codex platform sandbox |
+| Tests / CI | `SKIP_SANDBOX=1` | No | None |
+
+When running under Claude Code, configure sandbox policy via the `sandbox` block in `~/.claude/settings.json`. See the [Configuration guide](/docs/guide/configuration) for details.
 
 ## Troubleshooting
 
-### Network calls inside exec() fail unexpectedly
+### Linux/WSL2: bwrap not found
 
-**Symptom:** `exec()` code that makes HTTP requests throws connection errors or timeouts. The same request works when made directly from the shell.
-
-**Diagnosis steps:**
-
-1. Check mcp-exec's allowedDomains:
-   ```sh
-   cat ~/.claude/settings.json | grep -A5 '"network"'
-   cat .claude/settings.json 2>/dev/null | grep -A5 '"network"'
-   ```
-   The target domain must appear in `allowedDomains` in at least one of these files.
-
-2. Check if the issue is domain-specific or all-network:
-   ```typescript
-   // In exec() — try a simple fetch to a known-allowed domain
-   const r = await fetch('https://api.github.com');
-   return r.status;
-   ```
-   If even this fails, the issue may be at the Codex sandbox layer (network blocked entirely) rather than a domain-allowlist problem.
-
-3. Check mcp-exec startup logs for the warning:
-   ```
-   [mcp-exec] Warning: no sandbox configuration found in settings.json
-   ```
-   This means the `sandbox` block is missing. mcp-exec is running with srt defaults, which may not include your target domain.
-
-4. Verify Codex's network configuration. Refer to Codex CLI documentation for its sandbox network rules.
-
-### Filesystem writes inside exec() fail
-
-**Symptom:** writing to a path inside `exec()` throws `EACCES` or `EPERM`. The same write works from outside the sandbox.
-
-**Diagnosis steps:**
-
-1. Check if the path is in mcp-exec's `allowWrite`:
-   ```sh
-   cat ~/.claude/settings.json | grep -A10 '"filesystem"'
-   ```
-   If the path is absent, add it to `sandbox.filesystem.allowWrite` in the appropriate settings.json.
-
-2. Check if `/tmp` writes work — if not, the Codex platform sandbox is blocking filesystem access at a level above mcp-exec's config.
-
-3. For project paths, make sure you're using `.claude/settings.json` (project-scope) rather than only user-scope, as the project-scope config is processed from `process.cwd()` at startup.
-
-### Linux/WSL2: bwrap not found or unprivileged namespaces disabled
-
-**Symptom:** Codex CLI reports an error about bubblewrap or sandbox initialization when starting on Linux or WSL2.
-
-**Fix:**
+**Symptom:** Codex CLI reports an error about bubblewrap or sandbox initialization.
 
 ```sh
 # Install bwrap (Ubuntu/Debian)
 sudo apt-get install bubblewrap
 
-# Verify unprivileged user namespace support
+# Verify unprivileged user namespace support (must be 1)
 cat /proc/sys/kernel/unprivileged_userns_clone
-# Must be 1. If 0:
 echo 1 | sudo tee /proc/sys/kernel/unprivileged_userns_clone
 ```
 
-This is a Codex platform sandbox issue, not an mcp-exec issue. mcp-exec's own sandbox will initialize normally once Codex's outer sandbox is functional.
+On Ubuntu 24.04, AppArmor may restrict bubblewrap. Check for the `bwrap-userns-restrict` profile and disable it if needed per Codex documentation.
 
-### exec() returns exitCode 124 (timeout) more often under Codex
+### exec() sandbox not active
 
-The Codex platform sandbox may add latency to network calls and filesystem operations compared to running without it. If downstream MCP tool calls inside `exec()` are hitting your configured timeout because of this added latency, increase the timeout in the `runtime` config object:
+**Symptom:** mcp-exec logs show `SRT initialization skipped` but you expected SRT to be active.
+
+This is expected behavior under Codex. Codex's OS-level sandbox replaces SRT. If you need SRT active, remove `MCP_EXEC_RUNTIME=codex` from the env vars in your Codex config.toml (not recommended — it may cause SRT initialization failures inside Codex's sandbox).
+
+### exec() returns exitCode 124 (timeout)
+
+Codex's platform sandbox may add latency to network calls and filesystem operations. If downstream MCP tool calls inside `exec()` are hitting your timeout, increase it:
 
 ```typescript
-// Instead of:
-exec({ code, runtime: 'node' })
-
-// Use a config object with a higher timeout:
 exec({ code, runtime: { type: 'node', timeout: 30000 } })
 ```
-
-Default timeout when none is specified is determined by the srt sandbox runtime configuration.

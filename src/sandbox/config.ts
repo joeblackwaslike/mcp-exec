@@ -85,6 +85,61 @@ export function resolveSandboxConfig(cwd = process.cwd()): SandboxRuntimeConfig 
   };
 }
 
+export type CodexSandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
+
+export interface CodexConfig {
+  sandboxMode: CodexSandboxMode | undefined;
+  writableRoots: string[];
+}
+
+function readFileText(filePath: string): string {
+  try {
+    return readFileSync(filePath, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+function extractTomlString(toml: string, key: string): string | undefined {
+  return new RegExp(String.raw`\b${key}\s*=\s*"([^"]*)"`, 'm').exec(toml)?.[1];
+}
+
+function extractTomlStringArray(toml: string, key: string): string[] {
+  const m = new RegExp(String.raw`\b${key}\s*=\s*\[([^\]]*)\]`, 'ms').exec(toml);
+  if (!m?.[1]) return [];
+  return m[1]
+    .split(',')
+    .map((s) => s.trim().replace(/^"|"$/g, ''))
+    .filter(Boolean);
+}
+
+/**
+ * Reads sandbox-relevant keys from Codex config.toml files (user + project).
+ * Used for diagnostics when mcp-exec is running under Codex's native sandbox.
+ */
+export function resolveCodexConfig(cwd = process.cwd()): CodexConfig {
+  const combined = [
+    readFileText(join(homedir(), '.codex', 'config.toml')),
+    readFileText(join(cwd, '.codex', 'config.toml')),
+  ].join('\n');
+
+  const rawMode = extractTomlString(combined, 'sandbox_mode');
+  const sandboxMode: CodexSandboxMode | undefined =
+    rawMode === 'read-only' || rawMode === 'workspace-write' || rawMode === 'danger-full-access'
+      ? rawMode
+      : undefined;
+
+  return {
+    sandboxMode,
+    writableRoots: extractTomlStringArray(combined, 'writable_roots'),
+  };
+}
+
+/** Returns true when mcp-exec is running under Codex's native sandbox. */
+export function isCodexRuntime(): boolean {
+  return process.env.MCP_EXEC_RUNTIME === 'codex';
+}
+
 /** Filters process.env down to only the allowed variable names. */
 export function filterEnv(
   env: NodeJS.ProcessEnv,

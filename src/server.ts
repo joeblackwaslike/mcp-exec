@@ -7,35 +7,49 @@ import { BridgeServer } from './bridge/server.js';
 import { buildCatalog } from './catalog/builder.js';
 import { searchTools, setCatalog } from './catalog/index.js';
 import { connectMcpClients, readMcpConfig } from './mcp-clients/index.js';
-import { resolveSandboxConfig } from './sandbox/config.js';
+import { isCodexRuntime, resolveCodexConfig, resolveSandboxConfig } from './sandbox/config.js';
 import { createExecDispatcher } from './sandbox/index.js';
 import { SessionManager } from './sandbox/session.js';
 import type { RuntimeParam } from './types.js';
+
+async function initializeSandbox(): Promise<void> {
+  if (isCodexRuntime()) {
+    // Codex provides native OS-level sandboxing (Seatbelt on macOS, bubblewrap on Linux).
+    // SRT is not initialized; read config.toml only for diagnostic logging.
+    const codexConfig = resolveCodexConfig();
+    const modeNote = codexConfig.sandboxMode ? ` (${codexConfig.sandboxMode} mode)` : '';
+    process.stderr.write(
+      `[mcp-exec] Codex native sandbox detected${modeNote} — SRT initialization skipped\n`,
+    );
+    return;
+  }
+
+  const sandboxConfig = resolveSandboxConfig();
+  const hasSandboxBlock =
+    (sandboxConfig.network?.allowedDomains?.length ?? 0) > 0 ||
+    (sandboxConfig.filesystem?.allowWrite?.length ?? 1) > 1;
+
+  if (!hasSandboxBlock) {
+    process.stderr.write(
+      '[mcp-exec] Warning: no sandbox configuration found in settings.json — running with default permissions\n',
+    );
+  }
+
+  try {
+    // biome-ignore lint/suspicious/noExplicitAny: SandboxRuntimeConfig shape doesn't match srt internal type
+    await SandboxManager.initialize(sandboxConfig as any);
+  } catch (err) {
+    process.stderr.write(`[mcp-exec] Fatal: sandbox initialization failed: ${err}\n`);
+    process.exit(1);
+  }
+}
 
 async function main() {
   const skipSandbox = process.env.NODE_ENV === 'test' || process.env.SKIP_SANDBOX === '1';
   const skipLoader = process.env.NODE_ENV === 'test';
 
-  // Initialize srt sandbox (skipped in test/SKIP_SANDBOX environments)
   if (!skipSandbox) {
-    const sandboxConfig = resolveSandboxConfig();
-    const hasSandboxBlock =
-      (sandboxConfig.network?.allowedDomains?.length ?? 0) > 0 ||
-      (sandboxConfig.filesystem?.allowWrite?.length ?? 1) > 1;
-
-    if (!hasSandboxBlock) {
-      process.stderr.write(
-        '[mcp-exec] Warning: no sandbox configuration found in settings.json — running with default permissions\n',
-      );
-    }
-
-    try {
-      // biome-ignore lint/suspicious/noExplicitAny: SandboxRuntimeConfig shape doesn't match srt internal type
-      await SandboxManager.initialize(sandboxConfig as any);
-    } catch (err) {
-      process.stderr.write(`[mcp-exec] Fatal: sandbox initialization failed: ${err}\n`);
-      process.exit(1);
-    }
+    await initializeSandbox();
   }
 
   // Connect all downstream MCP clients from mcp.json (excluding mcp-exec itself)

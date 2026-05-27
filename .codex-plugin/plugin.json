@@ -11,6 +11,16 @@
   "license": "MIT",
   "keywords": ["mcp", "sandbox", "execution", "context-window", "token-reduction"],
   "skills": "./skills/",
+  "mcp_servers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"],
+      "env": {
+        "MCP_EXEC_RUNTIME": "codex"
+      },
+      "description": "Sandboxed code execution with MCP tool access"
+    }
+  },
   "interface": {
     "displayName": "mcp-exec",
     "shortDescription": "Sandboxed code execution — keep MCP results out of context",
