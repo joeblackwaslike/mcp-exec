@@ -1,0 +1,15 @@
+{
+  "name": "mcp-exec",
+  "version": "1.0.0",
+  "description": "Sandboxed code execution — keep intermediate MCP results out of the context window. Provides tools() for MCP catalog search and exec() for sandboxed Node/Bash/Python execution.",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"],
+      "env": {
+        "MCP_EXEC_RUNTIME": "gemini"
+      }
+    }
+  }
+}

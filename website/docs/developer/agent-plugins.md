@@ -175,37 +175,19 @@ See the [Codex Sandboxing reference](/docs/developer/codex-sandboxing) for full 
 
 ## Gemini CLI
 
-**Config file:** `GEMINI.md`
+**Extension manifest:** `.gemini-plugin/gemini-extension.json`
 
 ### Install
 
-Add the MCP server to your Gemini CLI config and include the skill references in your `GEMINI.md`:
+Copy the extension to your Gemini extensions directory:
 
-```md title="GEMINI.md"
-@./skills/using-mcp-exec/SKILL.md
-@./skills/mcp-exec-dev-workflow/SKILL.md
+```sh
+cp -r .gemini-plugin/ ~/.gemini/extensions/mcp-exec/
 ```
 
-Gemini CLI loads `@`-referenced files at session start. The skills inject at startup — no trigger phrase needed.
+Gemini auto-discovers extensions in `~/.gemini/extensions/`. The extension registers the MCP server and loads skills automatically — no further configuration needed.
 
-For the MCP server, add to your Gemini tools config:
-
-```json title="~/.gemini/settings.json"
-{
-  "mcpServers": {
-    "mcp-exec": {
-      "command": "npx",
-      "args": ["@joeblackwaslike2/mcp-exec"]
-    }
-  }
-}
-```
-
-### Sandbox
-
-Gemini CLI does not provide a native sandbox. mcp-exec uses SRT and reads from `~/.claude/settings.json` (the default when no `MCP_EXEC_RUNTIME` is set).
-
-If you prefer a Gemini-specific config file, you can set `MCP_EXEC_RUNTIME=opencode` in your Gemini MCP server env and use `~/.srt-settings.json` instead:
+**Manual registration** (without the extension):
 
 ```json title="~/.gemini/settings.json"
 {
@@ -213,11 +195,41 @@ If you prefer a Gemini-specific config file, you can set `MCP_EXEC_RUNTIME=openc
     "mcp-exec": {
       "command": "npx",
       "args": ["@joeblackwaslike2/mcp-exec"],
-      "env": { "MCP_EXEC_RUNTIME": "opencode" }
+      "env": { "MCP_EXEC_RUNTIME": "gemini" }
     }
   }
 }
 ```
+
+### Skills
+
+The extension includes a `GEMINI.md` context file that references both skills via `@` includes. Gemini loads this as always-on context at session start. The `skills/` subdirectory is also auto-discovered for on-demand skill activation.
+
+### Sandbox
+
+Gemini provides opt-in native OS sandboxing. mcp-exec **does not initialize SRT** when `MCP_EXEC_RUNTIME=gemini` is set — Gemini's sandbox handles OS-level enforcement when enabled.
+
+Enable the sandbox:
+
+```sh
+export GEMINI_SANDBOX=true      # auto-select mechanism
+# or in ~/.gemini/settings.json: "tools": { "sandbox": true }
+```
+
+Sandbox mechanisms by platform:
+
+| Platform | Mechanism | Notes |
+| --- | --- | --- |
+| macOS | Seatbelt (`sandbox-exec`) | `GEMINI_SANDBOX=sandbox-exec` |
+| Linux | bubblewrap (`bwrap`) | `GEMINI_SANDBOX=bwrap` — requires `apt install bubblewrap` |
+| Linux (high isolation) | gVisor (`runsc`) | `GEMINI_SANDBOX=runsc` — strongest isolation |
+| All | Docker / Podman | `GEMINI_SANDBOX=docker` or `podman` |
+
+:::caution
+Gemini's sandbox is **opt-in**. Without it, no OS-level isolation is active when running under Gemini. mcp-exec logs a warning at startup if it detects no sandbox.
+:::
+
+See the [Gemini Sandboxing reference](/docs/developer/gemini-sandboxing) for full details.
 
 ---
 
@@ -236,10 +248,12 @@ To wire mcp-exec into a new agent:
 
 1. Register the MCP server with `MCP_EXEC_RUNTIME=<agent-name>` as an env var
 2. Add a detection function in `src/sandbox/config.ts`:
+
    ```typescript
    export function isMyAgentRuntime(): boolean {
      return process.env.MCP_EXEC_RUNTIME === 'my-agent';
    }
    ```
+
 3. Add a branch in `initializeSandbox()` in `src/server.ts` — either skip SRT (if the agent provides native sandboxing) or call SRT with an appropriate config resolver
 4. Point the agent at the `skills/` directory so it discovers `using-mcp-exec` and `mcp-exec-dev-workflow`

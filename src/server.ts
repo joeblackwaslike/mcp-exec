@@ -9,8 +9,10 @@ import { searchTools, setCatalog } from './catalog/index.js';
 import { connectMcpClients, readMcpConfig } from './mcp-clients/index.js';
 import {
   isCodexRuntime,
+  isGeminiRuntime,
   isOpenCodeRuntime,
   resolveCodexConfig,
+  resolveGeminiConfig,
   resolveOpenCodeConfig,
   resolveSandboxConfig,
 } from './sandbox/config.js';
@@ -27,6 +29,22 @@ async function initializeSandbox(): Promise<void> {
     process.stderr.write(
       `[mcp-exec] Codex native sandbox detected${modeNote} — SRT initialization skipped\n`,
     );
+    return;
+  }
+
+  if (isGeminiRuntime()) {
+    // Gemini provides opt-in native sandboxing (Seatbelt, bwrap, gVisor, Docker).
+    // SRT is not initialized; GEMINI_SANDBOX / settings.json checked for diagnostics.
+    const geminiConfig = resolveGeminiConfig();
+    if (geminiConfig.sandboxEnabled) {
+      process.stderr.write(
+        `[mcp-exec] Gemini native sandbox active (${geminiConfig.sandboxType}) — SRT initialization skipped\n`,
+      );
+    } else {
+      process.stderr.write(
+        '[mcp-exec] Gemini runtime detected, no sandbox active — SRT skipped; enable GEMINI_SANDBOX for isolation\n',
+      );
+    }
     return;
   }
 

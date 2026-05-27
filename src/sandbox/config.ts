@@ -177,6 +177,44 @@ export function isOpenCodeRuntime(): boolean {
   return process.env.MCP_EXEC_RUNTIME === 'opencode';
 }
 
+export interface GeminiConfig {
+  sandboxEnabled: boolean;
+  sandboxType: string | undefined;
+}
+
+/**
+ * Detects whether Gemini's native sandbox is active by checking the GEMINI_SANDBOX
+ * env var (set by Gemini when sandbox mode is enabled) and ~/.gemini/settings.json.
+ * Used for diagnostic logging only — Gemini enforces the sandbox at the OS level.
+ */
+export function resolveGeminiConfig(cwd = process.cwd()): GeminiConfig {
+  const sandboxEnv = process.env.GEMINI_SANDBOX;
+  if (sandboxEnv && sandboxEnv !== 'false' && sandboxEnv !== '0') {
+    return { sandboxEnabled: true, sandboxType: sandboxEnv === 'true' ? 'auto' : sandboxEnv };
+  }
+
+  for (const settingsPath of [
+    join(cwd, '.gemini', 'settings.json'),
+    join(homedir(), '.gemini', 'settings.json'),
+  ]) {
+    try {
+      const raw = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      if (raw?.tools?.sandbox === true || raw?.sandbox === true) {
+        return { sandboxEnabled: true, sandboxType: 'settings' };
+      }
+    } catch {
+      // file absent or malformed — continue
+    }
+  }
+
+  return { sandboxEnabled: false, sandboxType: undefined };
+}
+
+/** Returns true when mcp-exec is running under Gemini CLI. */
+export function isGeminiRuntime(): boolean {
+  return process.env.MCP_EXEC_RUNTIME === 'gemini';
+}
+
 /** Filters process.env down to only the allowed variable names. */
 export function filterEnv(
   env: NodeJS.ProcessEnv,
