@@ -7,7 +7,13 @@ import { BridgeServer } from './bridge/server.js';
 import { buildCatalog } from './catalog/builder.js';
 import { searchTools, setCatalog } from './catalog/index.js';
 import { connectMcpClients, readMcpConfig } from './mcp-clients/index.js';
-import { isCodexRuntime, resolveCodexConfig, resolveSandboxConfig } from './sandbox/config.js';
+import {
+  isCodexRuntime,
+  isOpenCodeRuntime,
+  resolveCodexConfig,
+  resolveOpenCodeConfig,
+  resolveSandboxConfig,
+} from './sandbox/config.js';
 import { createExecDispatcher } from './sandbox/index.js';
 import { SessionManager } from './sandbox/session.js';
 import type { RuntimeParam } from './types.js';
@@ -24,14 +30,17 @@ async function initializeSandbox(): Promise<void> {
     return;
   }
 
-  const sandboxConfig = resolveSandboxConfig();
+  const isOpenCode = isOpenCodeRuntime();
+  const sandboxConfig = isOpenCode ? resolveOpenCodeConfig() : resolveSandboxConfig();
+  const configSource = isOpenCode ? '~/.srt-settings.json' : 'settings.json';
+
   const hasSandboxBlock =
     (sandboxConfig.network?.allowedDomains?.length ?? 0) > 0 ||
     (sandboxConfig.filesystem?.allowWrite?.length ?? 1) > 1;
 
   if (!hasSandboxBlock) {
     process.stderr.write(
-      '[mcp-exec] Warning: no sandbox configuration found in settings.json — running with default permissions\n',
+      `[mcp-exec] Warning: no sandbox configuration found in ${configSource} — running with default permissions\n`,
     );
   }
 

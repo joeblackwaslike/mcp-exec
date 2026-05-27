@@ -39,10 +39,10 @@ interface CcSandboxBlock {
   env?: { allow?: string[] };
 }
 
-function readSandboxBlock(settingsPath: string): CcSandboxBlock {
+function readSandboxBlock(settingsPath: string, nested = true): CcSandboxBlock {
   try {
     const raw = JSON.parse(readFileSync(settingsPath, 'utf8'));
-    return (raw?.sandbox as CcSandboxBlock) ?? {};
+    return ((nested ? raw?.sandbox : raw) as CcSandboxBlock) ?? {};
   } catch {
     return {};
   }
@@ -138,6 +138,43 @@ export function resolveCodexConfig(cwd = process.cwd()): CodexConfig {
 /** Returns true when mcp-exec is running under Codex's native sandbox. */
 export function isCodexRuntime(): boolean {
   return process.env.MCP_EXEC_RUNTIME === 'codex';
+}
+
+/**
+ * Reads sandbox config from ~/.srt-settings.json (user) and .srt-settings.json (project).
+ * Used when mcp-exec is running under OpenCode, which does not provide its own sandbox.
+ * The file format is the SandboxRuntimeConfig shape directly (no nesting under "sandbox").
+ */
+export function resolveOpenCodeConfig(cwd = process.cwd()): SandboxRuntimeConfig {
+  const userSettings = join(homedir(), '.srt-settings.json');
+  const projectSettings = join(cwd, '.srt-settings.json');
+
+  const user = readSandboxBlock(userSettings, false);
+  const project = readSandboxBlock(projectSettings, false);
+
+  const configuredAllow = mergeArrays(user.env?.allow, project.env?.allow);
+
+  return {
+    network: {
+      allowedDomains: mergeArrays(user.network?.allowedDomains, project.network?.allowedDomains),
+    },
+    filesystem: {
+      allowWrite: mergeArrays(user.filesystem?.allowWrite, project.filesystem?.allowWrite, [
+        '~/.mcp-exec/sessions',
+      ]),
+      denyRead: mergeArrays(user.filesystem?.denyRead, project.filesystem?.denyRead),
+      denyWrite: mergeArrays(user.filesystem?.denyWrite, project.filesystem?.denyWrite),
+      allowRead: mergeArrays(user.filesystem?.allowRead, project.filesystem?.allowRead),
+    },
+    env: {
+      allow: configuredAllow.length > 0 ? configuredAllow : DEFAULT_ENV_ALLOW,
+    },
+  };
+}
+
+/** Returns true when mcp-exec is running under OpenCode. */
+export function isOpenCodeRuntime(): boolean {
+  return process.env.MCP_EXEC_RUNTIME === 'opencode';
 }
 
 /** Filters process.env down to only the allowed variable names. */

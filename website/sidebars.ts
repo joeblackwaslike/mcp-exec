@@ -35,6 +35,7 @@ const sidebars: SidebarsConfig = {
         'developer/plugin-compatibility',
         'developer/observability',
         'developer/codex-sandboxing',
+        'developer/agent-plugins',
       ],
     },
     {

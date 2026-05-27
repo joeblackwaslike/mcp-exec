@@ -43,6 +43,17 @@ export const McpExecPlugin = async (_context) => {
       if (!config.skills.paths.includes(skillsDir)) {
         config.skills.paths.push(skillsDir);
       }
+
+      config.mcp = config.mcp || {};
+      config.mcp.servers = config.mcp.servers || {};
+      if (!config.mcp.servers['mcp-exec']) {
+        config.mcp.servers['mcp-exec'] = {
+          type: 'local',
+          command: 'npx',
+          args: ['@joeblackwaslike2/mcp-exec'],
+          env: { MCP_EXEC_RUNTIME: 'opencode' },
+        };
+      }
     },
 
     'experimental.chat.messages.transform': async (_input, output) => {

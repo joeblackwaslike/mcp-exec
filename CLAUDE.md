@@ -80,7 +80,7 @@ Full docs site at **https://joeblackwaslike.github.io/mcp-exec/**
 
 - [Guide](https://joeblackwaslike.github.io/mcp-exec/docs/guide/introduction) — Introduction, Installation, Getting Started, Configuration, CLI, Security
 - [User Manual](https://joeblackwaslike.github.io/mcp-exec/docs/manual/tools) — tools(), exec(), Runtimes, Sessions, Examples
-- [Developer](https://joeblackwaslike.github.io/mcp-exec/docs/developer/architecture) — Architecture, Plugin Compatibility, Observability, Codex Sandboxing
+- [Developer](https://joeblackwaslike.github.io/mcp-exec/docs/developer/architecture) — Architecture, Plugin Compatibility, Observability, Codex Sandboxing, Agent Plugin Setup
 - [Reference](https://joeblackwaslike.github.io/mcp-exec/docs/reference/competitive-analysis) — Competitive Analysis, Case Study, Projects Featured In, Changelog
 - [Interactive visualization](https://github.com/joeblackwaslike/mcp-exec/blob/main/docs/how-it-works.html) — open `docs/how-it-works.html` in a browser for the full system visualization
 

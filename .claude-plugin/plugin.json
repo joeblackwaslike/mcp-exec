@@ -1,9 +1,11 @@
 {
   "name": "mcp-exec",
   "description": "Sandboxed code execution MCP server \u2014 keep intermediate results out of the context window",
-  "author": "Joe Black",
+  "version": "1.0.0",
+  "author": { "name": "Joe Black" },
   "license": "MIT",
   "type": "plugin",
+  "skills": "./skills/",
   "mcp": {
     "servers": {
       "mcp-exec": {
