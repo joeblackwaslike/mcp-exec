@@ -92,3 +92,28 @@ Local development: `npm run docs:dev` (runs Docusaurus from `website/`)
 - No hosted/cloud product — local-first only
 - No vendor lock-in or credential system assumptions
 - Auth via env vars present in the shell environment (`.env`, direnv, secrets manager)
+
+## Skill activation triggers
+
+### `using-mcp-exec`
+
+Activate when:
+- About to call 2+ MCP tools in sequence and intermediate results don't need to stay in context
+- A single MCP tool call would return large results (record lists, API responses, search results)
+- Multi-step research, data aggregation, or schema processing
+- Fanning out across multiple sources to return a single summary
+
+### `mcp-exec-dev-workflow`
+
+Activate when:
+- Fetching API docs or exploring unfamiliar endpoints during active development
+- Processing large API responses or aggregating data in a dev research workflow
+- Even a single fetch returning 8,000+ tokens of docs — exec() can reduce it to a 200-token summary
+
+## Import syntax (inside exec)
+
+```typescript
+import { toolName } from 'mcp/server-name';
+```
+
+Server names match keys in `.claude/mcp.json` or your Codex MCP config.
