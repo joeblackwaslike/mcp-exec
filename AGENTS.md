@@ -84,7 +84,7 @@ Full docs site at **https://joeblackwaslike.github.io/mcp-exec/**
 - [Reference](https://joeblackwaslike.github.io/mcp-exec/docs/reference/competitive-analysis) — Competitive Analysis, Case Study, Projects Featured In, Changelog
 - [Interactive visualization](https://github.com/joeblackwaslike/mcp-exec/blob/main/docs/how-it-works.html) — open `docs/how-it-works.html` in a browser for the full system visualization
 
-Local development: `npm run docs:dev` (runs Docusaurus from `website/`)
+Local development: `pnpm docs:dev` (runs Docusaurus from `website/`)
 
 ## Constraints
 

@@ -2,29 +2,29 @@
 
 # Install dependencies
 install:
-    npm install
+    pnpm install
 
 # Run in development mode
 dev:
-    npx tsx src/server.ts
+    bun src/server.ts
 
 # Run all tests
 test:
-    npx vitest run
+    bunx vitest run
 
 # Run tests in watch mode
 test-watch:
-    npx vitest
+    bunx vitest
 
 # Build for distribution
 build:
-    npx tsc
+    bunx tsc
 
 # Run a single test file
 test-file FILE:
-    npx vitest run {{FILE}}
+    bunx vitest run {{FILE}}
 
 # Build then run smoke tests against the built binary (run before every release)
 smoke:
-    npm run build
+    pnpm build
     node scripts/smoke-test.mjs
