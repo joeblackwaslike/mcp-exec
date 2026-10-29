@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Migrated toolchain to pnpm + Bun: pnpm manages dependencies (`package-lock.json` removed, `pnpm-lock.yaml` is the lockfile), Bun runs the dev server and is pinned in `.bun-version`, `bunx` replaces `npx` in hooks and the justfile, and CI uses `pnpm/action-setup` + `oven-sh/setup-bun`. `npm publish --provenance` is kept in the release workflow. Added a devcontainer.
 
+### Fixed
+
+- Docs deploy: `docs.yml` published the removed VitePress output (`site/.vitepress/dist`) and ran on Node 20 (pnpm 11 needs 22). It now publishes `website/build` (Docusaurus), triggers on `website/**`, and uses Node 22. `website` is a pnpm workspace package, and Docusaurus is on 3.10.2 because 3.9.x with webpackbar 6 fails to build against current webpack.
+
 ## [1.0.0] - 2026-05-26
 
 ### Added
