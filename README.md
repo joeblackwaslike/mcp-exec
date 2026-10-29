@@ -687,11 +687,11 @@ See [DEVELOPER.md](docs/DEVELOPER.md) for the full pattern and `tool_calls` obse
 ## Development
 
 ```sh
-npm install
-npm run dev         # start server with tsx
-npm test            # vitest
-npm run typecheck   # tsc --noEmit
-npm run lint        # biome check
+pnpm install
+pnpm dev         # start server (bun)
+pnpm test           # vitest
+pnpm typecheck      # tsc --noEmit
+pnpm lint           # biome check
 ```
 
 Issue tracking: `bd ready` (requires beads).
