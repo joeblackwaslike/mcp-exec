@@ -26,9 +26,9 @@
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "prepare": "husky",
-    "docs:dev": "docusaurus start website",
-    "docs:build": "docusaurus build website",
-    "docs:preview": "docusaurus serve website"
+    "docs:dev": "pnpm --filter @joeblackwaslike2/mcp-exec-docs start",
+    "docs:build": "pnpm --filter @joeblackwaslike2/mcp-exec-docs build",
+    "docs:preview": "pnpm --filter @joeblackwaslike2/mcp-exec-docs serve"
   },
   "lint-staged": {
     "*.{ts,js,json}": "biome check --write --unsafe --no-errors-on-unmatched"
