@@ -1,25 +1,25 @@
 {
   "name": "mcp-exec",
-  "description": "Sandboxed code execution MCP server \u2014 keep intermediate results out of the context window",
-  "version": "1.0.0",
-  "author": { "name": "Joe Black" },
+  "description": "Sandboxed code execution MCP server — keep intermediate results out of the context window",
+  "version": "1.0.1",
+  "author": {
+    "name": "Joe Black"
+  },
   "license": "MIT",
   "type": "plugin",
   "skills": "./skills/",
-  "mcp": {
-    "servers": {
-      "mcp-exec": {
-        "command": "npx",
-        "args": ["@joeblackwaslike2/mcp-exec"],
-        "description": "Sandboxed code execution with MCP tool access"
-      }
-    }
-  },
   "commands": [
     {
       "name": "mcp-exec-prime-skill",
       "description": "Add mcp-exec activation rule to CLAUDE.md (primes the model to use it)",
       "run": "npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill"
     }
-  ]
+  ],
+  "mcpServers": {
+    "mcp-exec": {
+      "command": "npx",
+      "args": ["@joeblackwaslike2/mcp-exec"],
+      "description": "Sandboxed code execution with MCP tool access"
+    }
+  }
 }
