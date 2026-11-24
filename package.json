@@ -1,6 +1,6 @@
 {
   "name": "@joeblackwaslike2/mcp-exec",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "MCP server for sandboxed code execution with context window reduction",
   "bin": {
