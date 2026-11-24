@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Claude Code plugin manifest: `.claude-plugin/plugin.json` declared the server under `mcp.servers`, which Claude Code ignores. It now uses the top-level `mcpServers` key, so the plugin's MCP server loads.
+- Claude Code plugin manifest: `.claude-plugin/plugin.json` declared the server under `mcp.servers`, which Claude Code ignores. It now uses the top-level `mcpServers` key, so the plugin's MCP server loads. The invalid inline `commands` array (it failed `claude plugin validate`) is replaced by `commands/mcp-exec-prime-skill.md`.
 - Docs deploy: `docs.yml` published the removed VitePress output (`site/.vitepress/dist`) and ran on Node 20 (pnpm 11 needs 22). It now publishes `website/build` (Docusaurus), triggers on `website/**`, and uses Node 22. `website` is a pnpm workspace package, and Docusaurus is on 3.10.2 because 3.9.x with webpackbar 6 fails to build against current webpack.
 
 ## [1.0.0] - 2026-05-26

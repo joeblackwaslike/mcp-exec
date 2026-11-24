@@ -8,13 +8,6 @@
   "license": "MIT",
   "type": "plugin",
   "skills": "./skills/",
-  "commands": [
-    {
-      "name": "mcp-exec-prime-skill",
-      "description": "Add mcp-exec activation rule to CLAUDE.md (primes the model to use it)",
-      "run": "npx --package=@joeblackwaslike2/mcp-exec mcp-exec-prime-skill"
-    }
-  ],
   "mcpServers": {
     "mcp-exec": {
       "command": "npx",
