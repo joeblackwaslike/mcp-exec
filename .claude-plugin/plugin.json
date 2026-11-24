@@ -6,7 +6,6 @@
     "name": "Joe Black"
   },
   "license": "MIT",
-  "type": "plugin",
   "skills": "./skills/",
   "mcpServers": {
     "mcp-exec": {
